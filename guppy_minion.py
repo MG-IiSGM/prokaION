@@ -252,5 +252,4 @@ if __name__ == '__main__':
             fastqc_quality(sample, out_fastqc_dir, args.threads)
 
 
-    logger.info("\n" + MAGENTA + BOLD +
-                "#####END OF PIPELINE#####" + END_FORMATTING + "\n")
+    logger.info("\n" + MAGENTA + BOLD + "#####END OF PIPELINE#####" + END_FORMATTING + "\n")
