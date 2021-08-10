@@ -138,7 +138,7 @@ def rename_files(out_barcoding_dir, out_samples_dir, summary = False):
                 for name in files:
                     filename = os.path.join(root, name)
                     sum_files.append(filename)
-                print("Processing {} files in {}".format(len(sum_files), barcode))
+                logger.info(MAGENTA + DIM + BOLD + "Processing {} files in {}".format(len(sum_files), barcode))
             # print(sum_files)
             # if len(sum_files) > 1:
             with open(output_samples, 'w+') as bc_output:
