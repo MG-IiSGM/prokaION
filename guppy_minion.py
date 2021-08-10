@@ -108,13 +108,13 @@ def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_
         logger.info(YELLOW + DIM + BOLD + 'Barcodes are being used on at least 1 of the ends')
         require_barcodes_both_ends = ""
 
-    cmd = ['guppy_barcoder', '-i', out_basecalling_dir, '-s', out_barcoding_dir, '-r', require_barcodes_both_ends, '--barcode_kit', barcode_kit, '-t', str(threads), '--fastq_out', '--compress_fastq']
+    cmd = ['guppy_barcoder', '-i', out_basecalling_dir, '-s', out_barcoding_dir, '-r', require_barcodes_both_ends, '--barcode_kit', barcode_kit, '-t', str(threads), '--fastq_out']
 
     print(cmd)
     execute_subprocess(cmd, isShell = False)
 
 
-def read_filtering(out_barcoding_dir, out_samples_dir, summary = False, min_length = 270, max_length = 550):
+def rename_files(out_barcoding_dir, out_samples_dir, summary = False):
     
     # --directory:
     # --prefix:
@@ -124,15 +124,29 @@ def read_filtering(out_barcoding_dir, out_samples_dir, summary = False, min_leng
 
     with open(summary, 'r') as f:
         for line in f:
-            barcode = os.path.join(out_barcoding_dir, line.split('\t')[0].strip())
-            sample = line.split('\t')[1].strip()
-            output_samples = os.path.join(out_samples_dir, sample + '.fastq')
+            # barcode_path = os.path.join(out_barcoding_dir, line.split('\t')[0].strip())
+            # sample = line.split('\t')[1].strip()
+            barcode, sample = line.split('\t')
+            # print(barcode,sample)
+            barcode_path = os.path.join(out_barcoding_dir, barcode)
+            # print(barcode_path)
+            output_samples = os.path.join(out_samples_dir, sample.strip() + '.fastq')
             # print(output_samples)
 
-            cmd = ['artic', 'guppyplex', '--directory', barcode, '--prefix', sample, '--min-length', str(min_length), '--max-length', str(max_length), '--output', output_samples]
-
-            # print(cmd)
-            execute_subprocess(cmd, isShell = False, isInfo = True)
+            sum_files = []
+            for root, _, files in os.walk(barcode_path):
+                for name in files:
+                    filename = os.path.join(root, name)
+                    sum_files.append(filename)
+                print("Processing {} files in {}".format(len(sum_files), barcode))
+            # print(sum_files)
+            # if len(sum_files) > 1:
+            with open(output_samples, 'w+') as bc_output:
+                for bc_line in sum_files:
+                    with open(bc_line, 'r') as bcl:
+                        for line in bcl:
+                            bc_output.write(line)
+            # print(output_samples)
 
             cmd_compress = ['bgzip', output_samples, '--threads', str(args.threads)]
             # print(cmd_compress)
@@ -207,7 +221,7 @@ if __name__ == '__main__':
     check_create_dir(out_fastqc_dir)
 
 
-    ############### Start pipeline ###############
+    ############### START PIPELINE ###############
 
     # Basecalling
 
@@ -227,7 +241,7 @@ if __name__ == '__main__':
 
     logger.info("\n" + GREEN + "SAMPLE FILTERING" + END_FORMATTING + "\n")
 
-    read_filtering(out_barcoding_dir, out_samples_dir, summary = args.samples)
+    rename_files(out_barcoding_dir, out_samples_dir, summary = args.samples)
 
 
     # Quality Check
@@ -252,4 +266,4 @@ if __name__ == '__main__':
             fastqc_quality(sample, out_fastqc_dir, args.threads)
 
 
-    logger.info("\n" + MAGENTA + BOLD + "#####END OF PIPELINE#####" + END_FORMATTING + "\n")
+    # logger.info("\n" + MAGENTA + BOLD + "#####END OF PIPELINE#####" + END_FORMATTING + "\n")
