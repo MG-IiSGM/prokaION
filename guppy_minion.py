@@ -256,6 +256,8 @@ if __name__ == '__main__':
     check_create_dir(out_barcoding_dir)
     out_samples_dir = os.path.join(output_dir, 'Samples_Fastq')
     check_create_dir(out_samples_dir)
+    # out_correction_dir = os.path.join(out_samples_dir, 'Corrected')
+    # check_create_dir(out_correction_dir)
     out_qc_dir = os.path.join(output_dir, 'Quality')
     check_create_dir(out_qc_dir)
 
@@ -282,27 +284,18 @@ if __name__ == '__main__':
 
     rename_files(out_barcoding_dir, out_samples_dir, summary = args.samples)
 
+    ONT_filtering(out_samples_dir)
+
 
     # Quality Check
 
     logger.info("\n" + GREEN + "QUALITY CHECK IN RAW" + END_FORMATTING)
 
-    fastq = extract_read_list(out_samples_dir)
+    ONT_quality(out_samples_dir, out_qc_dir, threads = args.threads)
 
-    sample_fastq = []
 
-    for sample in fastq:
-        sample_base = os.path.basename(sample)
-        sample_fastq.append(os.path.basename(sample))
+    # MinION data correction
 
-        out_qc_raw_fastq = ('.').join(sample.split('/')[-1].split('.')[0:-2]) + '_fastqc.html'
-        out_qc_raw_file_fastq = os.path.join(out_qc_dir, out_qc_raw_fastq)
-
-        if os.path.isfile(out_qc_raw_file_fastq):
-            logger.info(YELLOW + DIM + out_qc_raw_file_fastq + ' EXIST\nOmmiting QC for sample ' + sample_base + END_FORMATTING)
-        else:
-            logger.info(GREEN + 'Checking quality in sample ' + sample_base + END_FORMATTING)
-            fastqc_quality(sample, out_qc_dir, args.threads)
-
+    # logger.info("\n" + GREEN + "MinION data correction" + END_FORMATTING)
 
     logger.info("\n" + MAGENTA + BOLD + "#####END OF ONT DATA PROCESSING PIPELINE#####" + END_FORMATTING + "\n")
