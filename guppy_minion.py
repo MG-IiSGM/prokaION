@@ -7,6 +7,7 @@ import argparse
 import sys
 import subprocess
 import datetime
+import gzip
 
 # Local application imports
 
@@ -66,7 +67,7 @@ def get_arguments():
 
     parser.add_argument('-t', '--threads', type = int, dest = 'threads', required = False, default = 30, help = 'Threads to use (30 threads by default)')
 
-    parser.add_argument('--num_callers', type = int, dest = 'num_callers', required = False, default = 10, help = 'Number of parallel basecallers')
+    parser.add_argument('--num_callers', type = int, dest = 'num_callers', required = False, default = 3, help = 'Number of parallel basecallers')
 
 
     arguments = parser.parse_args()
@@ -102,13 +103,13 @@ def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_
     # --require_barcodes_both_ends: Reads will only be classified if there is a barcode above the min_score at both ends of the read
 
     if require_barcodes_both_ends:
-        logger.info(GREEN + BOLD + 'Barcodes are being used at both ends')
+        logger.info(GREEN + BOLD + 'Barcodes are being used at both ends' + END_FORMATTING + "\n")
         require_barcodes_both_ends = "--require_barcodes_both_ends"
     else:
-        logger.info(YELLOW + DIM + BOLD + 'Barcodes are being used on at least 1 of the ends')
+        logger.info(YELLOW + DIM + BOLD + 'Barcodes are being used on at least 1 of the ends' + END_FORMATTING + "\n")
         require_barcodes_both_ends = ""
 
-    cmd = ['guppy_barcoder', '-i', out_basecalling_dir, '-s', out_barcoding_dir, '-r', require_barcodes_both_ends, '--barcode_kit', barcode_kit, '-t', str(threads), '--fastq_out']
+    cmd = ['guppy_barcoder', '-i', out_basecalling_dir, '-s', out_barcoding_dir, '-r', require_barcodes_both_ends, '--barcode_kit', barcode_kit, '-t', str(threads), '--fastq_out', '--compress_fastq']
 
     print(cmd)
     execute_subprocess(cmd, isShell = False)
@@ -132,14 +133,14 @@ def rename_files(out_barcoding_dir, out_samples_dir, summary = False):
                 for name in files:
                     filename = os.path.join(root, name)
                     sum_files.append(filename)
-                logger.info(MAGENTA + DIM + BOLD + "Processing {} files in {}".format(len(sum_files), barcode))
+                logger.info(MAGENTA + BOLD + "Processing {} files in {}".format(len(sum_files), barcode) + END_FORMATTING)
             # print(sum_files)
             # if len(sum_files) > 1:
             with open(output_samples, 'w+') as bc_output:
                 for bc_line in sum_files:
-                    with open(bc_line, 'r') as bcl:
+                    with gzip.open(bc_line, 'rb') as bcl:
                         for line in bcl:
-                            bc_output.write(line)
+                            bc_output.write(line.decode())
             # print(output_samples)
 
             cmd_compress = ['bgzip', output_samples, '--threads', str(args.threads)]
@@ -289,7 +290,7 @@ if __name__ == '__main__':
 
     # Quality Check
 
-    logger.info("\n" + GREEN + "QUALITY CHECK IN RAW" + END_FORMATTING)
+    logger.info("\n" + GREEN + "QUALITY CHECK IN RAW" + END_FORMATTING + "\n")
 
     ONT_quality(out_samples_dir, out_qc_dir, threads = args.threads)
 
