@@ -69,13 +69,15 @@ def get_arguments():
 
     parser.add_argument('--num_callers', type = int, dest = 'num_callers', required = False, default = 3, help = 'Number of parallel basecallers')
 
+    parser.add_argument('--records_per_fastq', type = int, dest = 'records_per_fastq', required = False, default = 0, help = 'Maximum number of records per fastq')
+
 
     arguments = parser.parse_args()
 
     return arguments
 
 
-def basecalling_ion(input_dir, out_basecalling_dir, config = 'dna_r9.4.1_450bps_fast.cfg', callers = 3, chunks = 2048, threads = 10):
+def basecalling_ion(input_dir, out_basecalling_dir, config = 'dna_r9.4.1_450bps_fast.cfg', callers = 3, chunks = 2048, threads = 10, records = 0):
 
     # -i: Path to input fast5 files
     # -s: Path to save fastq files
@@ -84,8 +86,9 @@ def basecalling_ion(input_dir, out_basecalling_dir, config = 'dna_r9.4.1_450bps_
     # --cpu_threads_per_caller: Number of CPU worker threads per basecaller
     # --chunks_per_runner: Maximum chunks per runner
     # --compress_fastq: Compress fastq output files with gzip
+    # --records_per_fastq: Maximum number of records per fastq file, 0 means use a single file (per worker, per run id)
 
-    cmd = ['guppy_basecaller', '-i', input_dir, '-s', out_basecalling_dir, '-c', config, '--num_callers', str(callers), '--chunks_per_runner', str(chunks), '--cpu_threads_per_caller', str(threads), '--compress_fastq']
+    cmd = ['guppy_basecaller', '-i', input_dir, '-s', out_basecalling_dir, '-c', config, '--num_callers', str(callers), '--chunks_per_runner', str(chunks), '--cpu_threads_per_caller', str(threads), '--records_per_fastq', str(records), '--compress_fastq']
 
     print(cmd)
     execute_subprocess(cmd, isShell = False)
@@ -269,7 +272,7 @@ if __name__ == '__main__':
 
     logger.info("\n" + GREEN + "STARTING BASECALLING" + END_FORMATTING + "\n")
 
-    basecalling_ion(input_dir, out_basecalling_dir, config = args.config, callers = args.num_callers, chunks = 2048, threads = args.threads)
+    basecalling_ion(input_dir, out_basecalling_dir, config = args.config, callers = args.num_callers, chunks = 2048, threads = args.threads, records = args.records_per_fastq)
 
 
     # Barcoding
