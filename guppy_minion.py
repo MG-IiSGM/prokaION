@@ -88,7 +88,7 @@ def get_arguments():
     return arguments
 
 
-def basecalling_ion(input_dir, out_basecalling_dir, config='dna_r9.4.1_450bps_fast.cfg', kit='SQK-LSK109', callers=3, chunks=2048, threads=10, records=0):
+def basecalling_ion(input_dir, out_basecalling_dir, config='dna_r9.4.1_450bps_fast.cfg', callers=3, chunks=2048, threads=10, records=0):
 
     # -i: Path to input fast5 files
     # -s: Path to save fastq files
@@ -100,7 +100,7 @@ def basecalling_ion(input_dir, out_basecalling_dir, config='dna_r9.4.1_450bps_fa
     # --compress_fastq: Compress fastq output files with gzip
     # --records_per_fastq: Maximum number of records per fastq file, 0 means use a single file (per worker, per run id)
 
-    cmd = ['guppy_basecaller', '-i', input_dir, '-s', out_basecalling_dir, '-c', config, '--kit', kit, '--num_callers',
+    cmd = ['guppy_basecaller', '-i', input_dir, '-s', out_basecalling_dir, '-c', config, '--num_callers',
            str(callers), '--chunks_per_runner', str(chunks), '--cpu_threads_per_caller', str(threads), '--records_per_fastq', str(records), '--compress_fastq']
 
     print(cmd)
