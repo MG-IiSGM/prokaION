@@ -6,5 +6,7 @@ For the development of this pipeline it is necessary to download [Guppy](https:/
 
 
 To install the environment with all the specifications installed, proceed as follows:
+
   conda create -n 'env_name'
+  
   conda install --yes --file 'spec_file' -c conda-forge
