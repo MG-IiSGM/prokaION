@@ -12,7 +12,6 @@ import gzip
 # Local application imports
 
 from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess
-from preprocess_ion import fastqc_quality
 
 
 logger = logging.getLogger()
@@ -22,7 +21,7 @@ logger = logging.getLogger()
 HEADER
 =============================================================
 Institution: IiSGM
-Author: Sergio Buenestado-Serrano (sergio.buenestado@gmail.com), Pedro J. Sola (pedroscampoy@gmail.com)
+Author: Sergio Buenestado-Serrano (sergio.buenestado@gmail.com)
 Version = 0
 Created: 24 March 2021
 
@@ -51,7 +50,7 @@ DIM = '\033[2m'
 def get_arguments():
 
     parser = argparse.ArgumentParser(
-        prog='guppy_minion.py', description='Pipeline to basecalling and barcoding fast5 files from minION sequencing')
+        prog='guppy_minion.py', description='Pipeline to basecalling and barcoding fast5 files from MinION sequencing')
 
     parser.add_argument('-i', '--input', dest='input_dir', metavar='input_directory',
                         type=str, required=True, help='REQUIRED. Input directory containing all fast5 files')
