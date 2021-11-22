@@ -50,7 +50,7 @@ UNDERLINE = '\033[4m'
 RED = '\033[31m'
 GREEN = '\033[32m'
 MAGENTA = '\033[35m'
-BLUE =  '\033[34m'
+BLUE = '\033[34m'
 CYAN = '\033[36m'
 YELLOW = '\033[93m'
 DIM = '\033[2m'
@@ -71,10 +71,12 @@ def check_file_exists(file_name):
     Check file exist and is not 0Kb, if not program exit.
     """
 
-    file_info = os.stat(file_name) # Retrieve the file into to check if has size > 0
+    # Retrieve the file into to check if has size > 0
+    file_info = os.stat(file_name)
 
     if not os.path.isfile(file_name) or file_info.st_size == 0:
-        logger.info(RED + BOLD + 'File: %s not found or empty\n' % file_name + END_FORMATTING)
+        logger.info(RED + BOLD + 'File: %s not found or empty\n' %
+                    file_name + END_FORMATTING)
         sys.exit(1)
     return os.path.isfile(file_name)
 
@@ -93,7 +95,7 @@ def extract_read_list(input_dir):
     all_files = []
 
     for root, _, files in os.walk(input_dir):
-        if root == input_dir: # This only apply to parent folder, not subdirectories
+        if root == input_dir:  # This only apply to parent folder, not subdirectories
             for name in files:
                 filename = os.path.join(root, name)
                 is_files = re.match(r".*\.f(ast)*[aq5](\.gz)*", name)
@@ -114,7 +116,7 @@ def extract_sample_list(file):
     return basename_file
 
 
-def execute_subprocess(cmd, isShell = False, isInfo = False):
+def execute_subprocess(cmd, isShell=False, isInfo=False):
     """
     https://crashcourse.housegordon.org/python-subprocess.html
     https://docs.python.org/3/library/subprocess.html 
@@ -126,17 +128,20 @@ def execute_subprocess(cmd, isShell = False, isInfo = False):
 
     if cmd[0] == 'samtools' or cmd[0] == 'bwa' or cmd[0] == 'artic':
         prog = ' '.join(cmd[0:2])
-        param = cmd [3:]
+        param = cmd[3:]
     else:
         prog = cmd[0]
         param = cmd[1:]
 
     try:
-        command = subprocess.run(cmd, shell = isShell, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        command = subprocess.run(
+            cmd, shell=isShell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if command.returncode == 0:
-            logger.debug(GREEN + DIM + 'Program %s successfully executed' % prog + END_FORMATTING)
+            logger.debug(
+                GREEN + DIM + 'Program %s successfully executed' % prog + END_FORMATTING)
         else:
-            logger.info(RED + BOLD + 'Command %s FAILED\n' % prog + END_FORMATTING + BOLD + 'with parameters: ' + END_FORMATTING + ' '.join(param) + '\n' + BOLD + 'EXIT-CODE: %d\n' % command.returncode + 'ERROR:\n' + END_FORMATTING + command.stderr.decode().strip())
+            logger.info(RED + BOLD + 'Command %s FAILED\n' % prog + END_FORMATTING + BOLD + 'with parameters: ' + END_FORMATTING + ' '.join(
+                param) + '\n' + BOLD + 'EXIT-CODE: %d\n' % command.returncode + 'ERROR:\n' + END_FORMATTING + command.stderr.decode().strip())
 
         if isInfo:
             logger.info(command.stdout.decode().strip())
@@ -146,59 +151,43 @@ def execute_subprocess(cmd, isShell = False, isInfo = False):
         logger.debug(command.stderr.decode().strip())
 
     except OSError as e:
-        sys.exit(RED + BOLD + "Failed to execute program '%s': %s" % (prog, str(e)) + END_FORMATTING)
+        sys.exit(RED + BOLD + "Failed to execute program '%s': %s" % (prog,
+                 str(e)) + END_FORMATTING)
 
 
-def check_reanalysis(output_dir):
+def check_reanalysis(output_dir, samples_to_analyze):
     output_dir = os.path.abspath(output_dir)
-    # group = output_dir.split('/')[-1]
+    new_samples = []
 
-    bam_dir = os.path.join(output_dir, 'Bam')
-    vcf_dir = os.path.join(output_dir, 'VCF')
-    vcfr_dir = os.path.join(output_dir, 'VCF_recal')
-    gvcf_dir = os.path.join(output_dir, 'GVCF')
-    gvcfr_dir = os.path.join(output_dir, 'GVCF_recal')
-    cov_dir = os.path.join(output_dir, 'Coverage')
-    table_dir = os.path.join(output_dir, 'Table')
+    variant_dir = os.path.join(output_dir, "Variants")
+    compare_dir = os.path.join(output_dir, "Compare")
 
-    previous_files = [bam_dir, vcf_dir, gvcf_dir, gvcfr_dir]
+    previous_files = [variant_dir, compare_dir]
 
-    # Check how many folder exist
-    file_exist = sum([os.path.exists(x) for x in previous_files]) # True = 1, False = 0
+    # Check how many folders exist
+    file_exist = sum([os.path.exists(x)
+                     for x in previous_files])  # True = 1, False = 0
 
-    # Handle reanalysis: First time; reanalysis or reanalysis with aditional samples
-    if file_exist > 0: # Already analysed
+    # Handle reanalysis: First time; reanalysis or realysis with aditional samples
+    if file_exist > 0:  # Already analysed
 
-        samples_analyzed = os.listdir(bam_dir)
-        samples_analyzed = len([x for x in samples_analyzed if '.bai' not in x and 'bqsr' in x])
+        previous_samples_list = os.listdir(variant_dir)
 
-        samples_fastq = os.listdir(output_dir)
-        samples_fastq = len([x for x in samples_fastq if x.endswith('fastq.gz')])
-
-        if samples_analyzed >= samples_fastq:
-            logger.info(MAGENTA + '\nPrevious analysis detected, no new sequences added\n' + END_FORMATTING)
-
+        if len(samples_to_analyze) == len(previous_samples_list):
+            logger.info(
+                MAGENTA + "\nPrevious analysis detected, no new sequences added\n" + END_FORMATTING)
         else:
-            logger.info(MAGENTA + '\nPrevious analysis detected, new sequences added\n' + END_FORMATTING)
-            for root, _, files in os.walk(output_dir):
-                if root == gvcf_dir or root == gvcfr_dir or root == vcfr_dir:
-                    for name in files:
-                        filename = os.path.join(root, name)
-                        if (('GVCF_recal' in filename) or ('/VCF_recal' in filename)) and 'cohort' in filename and samples_analyzed < 100:
-                            os.remove(filename)
-                        elif 'cohort' in filename and '/GVCF/' in filename:
-                            os.remove(filename)
-                elif root == vcf_dir or root == table_dir:
-                    for name in files:
-                        filename = os.path.join(root, name)
-                        if 'cohort' in filename or filename.endswith('.bed') or filename.endswith('.tab'):
-                            os.remove(filename)
-                elif root == cov_dir:
-                    for name in files:
-                        filename = os.path.join(root, name)
-                        if 'coverage.tab' in filename:
-                            os.remove(filename)
-                        if 'poorly_covered.bed' in filename and samples_analyzed < 100:
-                            os.remove(filename)
+            new_samples = set(samples_to_analyze) - set(previous_samples_list)
+            logger.info(MAGENTA + "\nPrevious analysis detected, " +
+                        str(len(new_samples)) + " new sequences added\n" + END_FORMATTING)
+
+    return list(new_samples)
 
 
+def file_to_list(file_name):
+    list_F = []
+    file_name_abs = os.path.abspath(file_name)
+    with open(file_name_abs, 'r') as f:
+        for line in f:
+            list_F.append(line.strip())
+    return list_F

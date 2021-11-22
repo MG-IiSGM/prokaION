@@ -11,7 +11,7 @@ import gzip
 
 # Local application imports
 
-from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess
+from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list
 
 
 logger = logging.getLogger()
@@ -26,8 +26,6 @@ Version = 0
 Created: 22 November 2021
 
 TODO:
-    Adapt check_reanalysis
-    Check file with multiple arguments
     Check program is installed (dependencies)
 ================================================================
 END_OF_HEADER
@@ -79,7 +77,7 @@ def get_arguments():
                               action='store_false', help='Clean unwanted files for standard execution')
 
 
-def run_snippy(minion_fastq, reference, output_dir, sample, threads=30, minqual=10, minfrac=0.1, mincov=1):
+def run_snippy(input_sample_dir, reference, out_variant_dir, threads=30, minqual=10, minfrac=0.1, mincov=1):
     """
     https://github.com/tseemann/snippy
     USAGE
@@ -97,13 +95,21 @@ def run_snippy(minion_fastq, reference, output_dir, sample, threads=30, minqual=
     # --ref: Reference genome. Supports FASTA, GenBank, EMBL (not GFF)
     # --se: Single-end reads
 
-    prefix = os.path.join(output_dir, sample)
+    for root, _, files in os.walk(input_sample_dir):
+        for name in files:
+            if 'HQ' in name:
+                # print(name)
+                minion_fastq = os.path.join(root, name)
+                # print(HQ_filename)
+                minion_out_variant = os.path.join(
+                    out_variant_dir, os.path.basename(minion_fastq.split('.')[0]))
+                check_create_dir(minion_out_variant)
 
-    cmd_snippy = ['snippy', '--cpus', str(threads), '--outdir', prefix, '--minqual', str(minqual), '--mincov', str(
-        mincov), '--minfrac', str(minfrac), '--ref', reference, '--se', minion_fastq]
+                cmd_snippy = ['snippy', '--cpus', str(threads), '--outdir', minion_out_variant, '--minqual', str(
+                    minqual), '--mincov', str(mincov), '--minfrac', str(minfrac), '--ref', reference, '--se', minion_fastq]
 
-    print(cmd_snippy)
-    execute_subprocess(cmd_snippy, isShell=False)
+                print(cmd_snippy)
+                execute_subprocess(cmd_snippy, isShell=False)
 
 
 if __name__ == '__main__':
@@ -114,6 +120,7 @@ if __name__ == '__main__':
     output_dir = os.path.abspath(args.output)
     group_name = output_dir.split('/')[-1]
     check_create_dir(output_dir)
+    reference = os.path.abspath(args.reference)
 
     # Logging
     # Create log file with date and time
@@ -140,3 +147,47 @@ if __name__ == '__main__':
 
     logger.addHandler(stream_handler)
     logger.addHandler(file_handler)
+
+    logger.info(
+        "\n" + BLUE + '############### START VARIANT CALLING ###############' + END_FORMATTING + "\n")
+    logger.info(args)
+
+    # Obtain all fastq files from folder
+
+    fastq = extract_read_list(args.input_dir)
+
+    # Check how many files will be analysed
+
+    sample_list = []
+
+    for sample in fastq:
+        sample = extract_sample_list(sample)
+        sample_list.append(sample)
+
+    logger.info("\n" + CYAN + '{} Samples will be analysed: {}'.format(
+        len(sample_list), ",".join(sample_list)) + END_FORMATTING)
+
+    # Check if there are samples to filter out
+
+    sample_list_F = []
+    if args.sample_list == None:
+        logger.info("\n" + 'No samples to filter')
+        for sample in fastq:
+            sample = extract_sample_list(sample)
+            sample_list_F.append(sample)
+    else:
+        logger.info("Samples will be filtered")
+        sample_list_F = file_to_list(args.sample_list)
+
+    new_samples = check_reanalysis(args.output, sample_list_F)
+
+    logger.info('\n%d Samples will be analysed: %s' %
+                (len(sample_list_F), ','.join(sample_list_F)))
+    logger.info('\n%d NEW samples will be analysed: %s' %
+                (len(new_samples), ','.join(new_samples)))
+
+    # Declare folders created in pipeline and key files
+
+    input_sample_dir = os.path.join(input_dir, 'Samples_Fastq')
+    out_variant_dir = os.path.join(output_dir, "Variants")
+    check_create_dir(out_variant_dir)

@@ -11,7 +11,7 @@ import gzip
 
 # Local application imports
 
-from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess
+from misc_ion import check_create_dir, extract_read_list, extract_sample_list, execute_subprocess
 
 
 logger = logging.getLogger()
@@ -26,8 +26,6 @@ Version = 0
 Created: 24 March 2021
 
 TODO:
-    Adapt check_reanalysis
-    Check file with multiple arguments
     Check program is installed (dependencies)
 ================================================================
 END_OF_HEADER
