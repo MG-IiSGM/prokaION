@@ -256,4 +256,4 @@ if __name__ == '__main__':
                      reference=args.reference, threads=args.threads)
 
     logger.info("\n" + MAGENTA + BOLD +
-                "##### END OF ONT DATA PROCESSING PIPELINE #####" + "\n" + END_FORMATTING)
+                "##### END OF ONT VARIANT CALLING PIPELINE #####" + "\n" + END_FORMATTING)
