@@ -77,39 +77,66 @@ def get_arguments():
                               action='store_false', help='Clean unwanted files for standard execution')
 
 
-def run_snippy(input_sample_dir, reference, out_variant_dir, threads=30, minqual=10, minfrac=0.1, mincov=1):
+# def run_snippy(input_sample_dir, reference, out_variant_dir, threads=30, minqual=10, minfrac=0.1, mincov=1):
+#     """
+#     https://github.com/tseemann/snippy
+#     USAGE
+#         snippy [options] --outdir <dir> --ref <ref> --R1 <R1.fq.gz> --R1 <R2.fq.gz>
+#         snippy [options] --outdir <dir> --ref <ref> --ctgs <contigs.fa>
+#         snippy [options] --outdir <dir> --ref <ref> --bam <reads.bam>
+#     """
+
+#     # --cpus: Maximum number of CPU cores to use
+#     # --outdir: Output folder
+#     # --prefix: Prefix for output files (default 'snps')
+#     # --minqual: Minumum QUALITY in VCF column 6
+#     # --mincov: Minimum site depth to for calling alleles
+#     # --minfrac: Minumum proportion for variant evidence
+#     # --ref: Reference genome. Supports FASTA, GenBank, EMBL (not GFF)
+#     # --se: Single-end reads
+
+#     for root, _, files in os.walk(input_sample_dir):
+#         for name in files:
+#             if 'HQ' in name:
+#                 # print(name)
+#                 minion_fastq = os.path.join(root, name)
+#                 # print(HQ_filename)
+#                 minion_out_variant = os.path.join(
+#                     out_variant_dir, os.path.basename(minion_fastq.split('.')[0]))
+#                 check_create_dir(minion_out_variant)
+
+#                 cmd_snippy = ['snippy', '--cpus', str(threads), '--outdir', minion_out_variant, '--minqual', str(
+#                     minqual), '--mincov', str(mincov), '--minfrac', str(minfrac), '--ref', reference, '--se', minion_fastq]
+
+#                 print(cmd_snippy)
+#                 execute_subprocess(cmd_snippy, isShell=False)
+
+def minimap2_mapping(out_samples_filtered_dir, reference, out_sorted_bam, threads=30):
     """
-    https://github.com/tseemann/snippy
-    USAGE
-        snippy [options] --outdir <dir> --ref <ref> --R1 <R1.fq.gz> --R1 <R2.fq.gz>
-        snippy [options] --outdir <dir> --ref <ref> --ctgs <contigs.fa>
-        snippy [options] --outdir <dir> --ref <ref> --bam <reads.bam>
+    https://github.com/lh3/minimap2
+        minimap2 -ax map-ont ref.fa ont.fq.gz > aln.sam         # Oxford Nanopore genomic reads
+
+    http://www.htslib.org/doc/samtools.html
     """
 
-    # --cpus: Maximum number of CPU cores to use
-    # --outdir: Output folder
-    # --prefix: Prefix for output files (default 'snps')
-    # --minqual: Minumum QUALITY in VCF column 6
-    # --mincov: Minimum site depth to for calling alleles
-    # --minfrac: Minumum proportion for variant evidence
-    # --ref: Reference genome. Supports FASTA, GenBank, EMBL (not GFF)
-    # --se: Single-end reads
+    # -a: Output in the SAM format
+    # -x: Preset (always applied before other options; see minimap2.1 for details) []
+    #    - map-pb/map-ont - PacBio CLR/Nanopore vs reference mapping
+    #    - map-hifi - PacBio HiFi reads vs reference mapping
+    #    - ava-pb/ava-ont - PacBio/Nanopore read overlap
+    #    - asm5/asm10/asm20 - asm-to-ref mapping, for ~0.1/1/5% sequence divergence
+    #    - splice/splice:hq - long-read/Pacbio-CCS spliced alignment
+    #    - sr - genomic short-read mapping
+    # -t: Number of threads
 
-    for root, _, files in os.walk(input_sample_dir):
+    # -b: Output BAM
+    # -S: Ignored (input format is auto-detected)
+    # -F: Only include reads with none of the FLAGS in INT present
+    # --threads: Number of additional threads to use
+
+    for root, _, files in os.walk(out_samples_filtered_dir):
         for name in files:
-            if 'HQ' in name:
-                # print(name)
-                minion_fastq = os.path.join(root, name)
-                # print(HQ_filename)
-                minion_out_variant = os.path.join(
-                    out_variant_dir, os.path.basename(minion_fastq.split('.')[0]))
-                check_create_dir(minion_out_variant)
-
-                cmd_snippy = ['snippy', '--cpus', str(threads), '--outdir', minion_out_variant, '--minqual', str(
-                    minqual), '--mincov', str(mincov), '--minfrac', str(minfrac), '--ref', reference, '--se', minion_fastq]
-
-                print(cmd_snippy)
-                execute_subprocess(cmd_snippy, isShell=False)
+            filename = os.path.join(root, name)
 
 
 if __name__ == '__main__':
@@ -188,6 +215,7 @@ if __name__ == '__main__':
 
     # Declare folders created in pipeline and key files
 
-    input_sample_dir = os.path.join(input_dir, 'Samples_Fastq')
+    out_samples_filtered_dir = os.path.join(
+        input_dir, 'Samples_Fastq/Filtered_Fastq')
     out_variant_dir = os.path.join(output_dir, "Variants")
     check_create_dir(out_variant_dir)
