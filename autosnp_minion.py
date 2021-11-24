@@ -67,14 +67,18 @@ def get_arguments():
     input_group.add_argument('-p', '--primers', type=str,
                              required=False, help='Bed file including primers to trim')
 
+    input_group.add_argument('-t', '--threads', type=int, dest='threads', required=False,
+                             default=30, help='Threads to use (30 threads by default)')
+
     output_group = parser.add_argument_group(
         'Output', 'Required parameter to output results')
 
     output_group.add_argument('-o', '--output', type=str, required=True,
                               help='REQUIRED. Output directory to extract all results')
 
-    output_group.add_argument('-C', '--noclean', required=False,
-                              action='store_false', help='Clean unwanted files for standard execution')
+    arguments = parser.parse_args()
+
+    return arguments
 
 
 # def run_snippy(input_sample_dir, reference, out_variant_dir, threads=30, minqual=10, minfrac=0.1, mincov=1):
@@ -111,10 +115,12 @@ def get_arguments():
 #                 print(cmd_snippy)
 #                 execute_subprocess(cmd_snippy, isShell=False)
 
-def minimap2_mapping(out_samples_filtered_dir, reference, out_sorted_bam, threads=30):
+
+def minimap2_mapping(out_samples_filtered_dir, out_sorted_bam, reference, threads=30):
     """
     https://github.com/lh3/minimap2
-        minimap2 -ax map-ont ref.fa ont.fq.gz > aln.sam         # Oxford Nanopore genomic reads
+        # Oxford Nanopore genomic reads
+        minimap2 -ax map-ont ref.fa ont.fq.gz > aln.sam
 
     http://www.htslib.org/doc/samtools.html
     """
@@ -136,7 +142,29 @@ def minimap2_mapping(out_samples_filtered_dir, reference, out_sorted_bam, thread
 
     for root, _, files in os.walk(out_samples_filtered_dir):
         for name in files:
-            filename = os.path.join(root, name)
+            HQ_filename = os.path.join(root, name)
+            filename_out = name.split('.')[0].split('_')[1]
+            # print(filename_out)
+            filename_bam_out = os.path.join(
+                out_sorted_bam, filename_out + '.sort.bam')
+            filename_bai_out = os.path.join(
+                out_sorted_bam, filename_out + '.sort.bam.bai')
+            # print(filename_bam_out)
+
+            if os.path.isfile(filename_bai_out):
+                logger.info(YELLOW + DIM + BOLD + filename_bam_out +
+                            ' EXIST\nOmmiting filtering for sample ' + filename_out + '\n' + END_FORMATTING)
+            else:
+                logger.info(GREEN + 'Mapping sample ' +
+                            filename_out + END_FORMATTING)
+                cmd_minimap2 = 'minimap2 -ax map-ont {} {} | samtools view -bS -F 4 - | samtools sort -o {}'.format(
+                    reference, HQ_filename, filename_bam_out)
+                # print(cmd_minimap2)
+                execute_subprocess(cmd_minimap2, isShell=True)
+
+                cmd_indexing = 'samtools', 'index', filename_bam_out
+                # print(cmd_indexing)
+                execute_subprocess(cmd_indexing, isShell=False)
 
 
 if __name__ == '__main__':
@@ -144,6 +172,8 @@ if __name__ == '__main__':
     args = get_arguments()
 
     input_dir = os.path.abspath(args.input_dir)
+    in_samples_filtered_dir = os.path.join(
+        input_dir, 'Samples_Fastq/Filtered_Fastq')
     output_dir = os.path.abspath(args.output)
     group_name = output_dir.split('/')[-1]
     check_create_dir(output_dir)
@@ -181,7 +211,7 @@ if __name__ == '__main__':
 
     # Obtain all fastq files from folder
 
-    fastq = extract_read_list(args.input_dir)
+    fastq = extract_read_list(in_samples_filtered_dir)
 
     # Check how many files will be analysed
 
@@ -211,11 +241,19 @@ if __name__ == '__main__':
     logger.info('\n%d Samples will be analysed: %s' %
                 (len(sample_list_F), ','.join(sample_list_F)))
     logger.info('\n%d NEW samples will be analysed: %s' %
-                (len(new_samples), ','.join(new_samples)))
+                (len(new_samples), ','.join(new_samples) + '\n'))
 
     # Declare folders created in pipeline and key files
 
-    out_samples_filtered_dir = os.path.join(
-        input_dir, 'Samples_Fastq/Filtered_Fastq')
-    out_variant_dir = os.path.join(output_dir, "Variants")
-    check_create_dir(out_variant_dir)
+    out_bam_dir = os.path.join(output_dir, "Bam")
+    check_create_dir(out_bam_dir)
+
+    ############### START PIPELINE ###############
+
+    # Mapping with minimap2, sorting Bam and indexing it
+
+    minimap2_mapping(in_samples_filtered_dir, out_bam_dir,
+                     reference=args.reference, threads=args.threads)
+
+    logger.info("\n" + MAGENTA + BOLD +
+                "##### END OF ONT DATA PROCESSING PIPELINE #####" + "\n" + END_FORMATTING)
