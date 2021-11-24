@@ -236,13 +236,6 @@ if __name__ == '__main__':
         logger.info("Samples will be filtered")
         sample_list_F = file_to_list(args.sample_list)
 
-    new_samples = check_reanalysis(args.output, sample_list_F)
-
-    logger.info('\n%d Samples will be analysed: %s' %
-                (len(sample_list_F), ','.join(sample_list_F)))
-    logger.info('\n%d NEW samples will be analysed: %s' %
-                (len(new_samples), ','.join(new_samples) + '\n'))
-
     # Declare folders created in pipeline and key files
 
     out_bam_dir = os.path.join(output_dir, "Bam")
