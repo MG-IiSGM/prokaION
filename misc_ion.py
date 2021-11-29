@@ -191,3 +191,32 @@ def file_to_list(file_name):
         for line in f:
             list_F.append(line.strip())
     return list_F
+
+
+def samtools_faidx(reference):
+    # samtools faidx reference.fa
+
+    input_reference = os.path.abspath(reference)
+    fai_reference = input_reference + ".fai"
+
+    if os.path.isfile(fai_reference):
+        logger.info(fai_reference + " already EXISTS")
+    else:
+        cmd_faidx = 'samtools', 'faidx', reference
+        execute_subprocess(cmd_faidx, isShell=False)
+
+
+def create_reference_chunks(reference, num_chunks=100000):
+
+    input_reference = os.path.abspath(reference)
+    input_folder = os.path.dirname(reference)
+    out_reference_file = os.path.join(
+        input_folder, 'reference.' + str(num_chunks) + '.regions')
+    fai_reference = input_reference + '.fai'
+
+    if os.path.isfile(out_reference_file):
+        logger.info(out_reference_file + " already EXISTS")
+    else:
+        cmd_chunks = "fasta_generate_regions.py {} {} > {}".format(
+            fai_reference, num_chunks, out_reference_file)
+        execute_subprocess(cmd_chunks, isShell=True)

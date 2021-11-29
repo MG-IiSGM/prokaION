@@ -11,7 +11,7 @@ import gzip
 
 # Local application imports
 
-from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list
+from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list, samtools_faidx, create_reference_chunks
 
 
 logger = logging.getLogger()
@@ -69,6 +69,9 @@ def get_arguments():
 
     input_group.add_argument('-t', '--threads', type=int, dest='threads', required=False,
                              default=30, help='Threads to use (30 threads by default)')
+
+    input_group.add_argument('--chunks', type=int, dest='chunks', required=False, default=100000,
+                             help='Generate regions that are equal in terms of data content, and thus have lower variance in runtime')
 
     output_group = parser.add_argument_group(
         'Output', 'Required parameter to output results')
@@ -152,7 +155,7 @@ def minimap2_mapping(out_samples_filtered_dir, out_sorted_bam, reference, thread
             # print(filename_bam_out)
 
             if os.path.isfile(filename_bai_out):
-                logger.info(YELLOW + DIM + BOLD + filename_bam_out +
+                logger.info(YELLOW + BOLD + filename_bam_out +
                             ' EXIST\nOmmiting filtering for sample ' + filename_out + '\n' + END_FORMATTING)
             else:
                 logger.info(GREEN + 'Mapping sample ' +
@@ -206,7 +209,7 @@ if __name__ == '__main__':
     logger.addHandler(file_handler)
 
     logger.info(
-        "\n" + BLUE + '############### START VARIANT CALLING ###############' + END_FORMATTING + "\n")
+        '\n' + BLUE + '############### START VARIANT CALLING ###############' + END_FORMATTING + '\n')
     logger.info(args)
 
     # Obtain all fastq files from folder
@@ -221,32 +224,44 @@ if __name__ == '__main__':
         sample = extract_sample_list(sample)
         sample_list.append(sample)
 
-    logger.info("\n" + CYAN + '{} Samples will be analysed: {}'.format(
-        len(sample_list), ",".join(sample_list)) + END_FORMATTING)
+    logger.info('\n' + CYAN + '{} Samples will be analysed: {}'.format(
+        len(sample_list), ', '.join(sample_list)) + END_FORMATTING)
 
     # Check if there are samples to filter out
 
     sample_list_F = []
     if args.sample_list == None:
-        logger.info("\n" + 'No samples to filter')
+        logger.info('\n' + 'No samples to filter' + '\n')
         for sample in fastq:
             sample = extract_sample_list(sample)
             sample_list_F.append(sample)
     else:
-        logger.info("Samples will be filtered")
+        logger.info('Samples will be filtered')
         sample_list_F = file_to_list(args.sample_list)
 
     # Declare folders created in pipeline and key files
 
-    out_bam_dir = os.path.join(output_dir, "Bam")
+    out_bam_dir = os.path.join(output_dir, 'Bam')
     check_create_dir(out_bam_dir)
 
     ############### START PIPELINE ###############
 
     # Mapping with minimap2, sorting Bam and indexing it
 
+    logger.info('\n' + GREEN + "STARTING SAMPLE MAPPING" +
+                '\n' + END_FORMATTING)
+
     minimap2_mapping(in_samples_filtered_dir, out_bam_dir,
                      reference=args.reference, threads=args.threads)
 
-    logger.info("\n" + MAGENTA + BOLD +
-                "##### END OF ONT VARIANT CALLING PIPELINE #####" + "\n" + END_FORMATTING)
+    # Variant calling with freebayes-parallel
+
+    logger.info('\n' + GREEN + "STARTING VARIANT CALLING" +
+                '\n' + END_FORMATTING)
+
+    samtools_faidx(args.reference)
+
+    create_reference_chunks(args.reference, num_chunks=args.chunks)
+
+    logger.info('\n' + MAGENTA + BOLD +
+                '##### END OF ONT VARIANT CALLING PIPELINE #####' + '\n' + END_FORMATTING)

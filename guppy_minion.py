@@ -117,11 +117,11 @@ def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_
 
     if require_barcodes_both_ends:
         logger.info(
-            GREEN + BOLD + 'Barcodes are being used at both ends' + END_FORMATTING + "\n")
+            GREEN + BOLD + 'Barcodes are being used at both ends' + END_FORMATTING + '\n')
         require_barcodes_both_ends = "--require_barcodes_both_ends"
     else:
-        logger.info(YELLOW + DIM + BOLD +
-                    'Barcodes are being used on at least 1 of the ends' + END_FORMATTING + "\n")
+        logger.info(YELLOW + BOLD +
+                    'Barcodes are being used on at least 1 of the ends' + END_FORMATTING + '\n')
         require_barcodes_both_ends = ""
 
     cmd = ['guppy_barcoder', '-i', out_basecalling_dir, '-s', out_barcoding_dir, '-r', require_barcodes_both_ends,
@@ -157,7 +157,7 @@ def rename_files(out_barcoding_dir, out_samples_dir, summary=False):
             # print(sum_files)
             # if len(sum_files) > 1:
                 if os.path.isfile(output_samples_gz):
-                    logger.info(YELLOW + DIM + BOLD + sample +
+                    logger.info(YELLOW + BOLD + sample +
                                 ' sample already renamed' + '\n' + END_FORMATTING)
                 else:
                     logger.info(GREEN + 'Renaming sample ' +
@@ -189,7 +189,7 @@ def ONT_filtering(out_samples_dir, out_samples_filtered_dir):
                     # print(filename_out)
 
                 if os.path.isfile(filename_out):
-                    logger.info(YELLOW + DIM + BOLD + name2 +
+                    logger.info(YELLOW + BOLD + name2 +
                                 ' EXIST\nOmmiting filtering for sample ' + name + '\n' + END_FORMATTING)
                 else:
                     logger.info(
@@ -224,7 +224,7 @@ def ONT_quality(out_samples_filtered_dir, out_qc_dir, threads=30):
                 # print(HQ_outreport)
 
                 if os.path.isfile(HQ_outreport_file):
-                    logger.info(YELLOW + DIM + BOLD + HQ_outreport_file +
+                    logger.info(YELLOW + BOLD + HQ_outreport_file +
                                 ' EXIST\nOmmiting QC for sample ' + name + '\n' + END_FORMATTING)
                 else:
                     logger.info(
@@ -271,7 +271,7 @@ if __name__ == '__main__':
     logger.addHandler(file_handler)
 
     logger.info(
-        "\n" + BLUE + '############### START PROCESSING FAST5 FILES ###############' + END_FORMATTING + "\n")
+        '\n' + BLUE + '############### START PROCESSING FAST5 FILES ###############' + END_FORMATTING + '\n')
     logger.info(args)
 
     # Obtain all fast5 files from folder
@@ -286,7 +286,7 @@ if __name__ == '__main__':
         sample = extract_sample_list(sample)
         sample_list.append(sample)
 
-    logger.info("\n" + CYAN + "{} Samples will be analysed: {}".format(
+    logger.info('\n' + CYAN + "{} Samples will be analysed: {}".format(
         len(sample_list), ",".join(sample_list)) + END_FORMATTING)
 
     # Declare folders created in pipeline and key files
@@ -312,48 +312,52 @@ if __name__ == '__main__':
 
     # Basecalling
 
+    logger.info('\n' + GREEN + "STARTING BASECALLING" + END_FORMATTING)
+
     if os.path.isfile(basecalling_summary):
-        logger.info("\n" + YELLOW + "Ommiting BASECALLING" +
-                    END_FORMATTING + "\n")
+        logger.info('\n' + YELLOW + BOLD + "Ommiting BASECALLING" +
+                    END_FORMATTING + '\n')
     else:
-        logger.info("\n" + GREEN + "STARTING BASECALLING" +
-                    END_FORMATTING + "\n")
+        logger.info('\n' + GREEN + "STARTING BASECALLING" +
+                    END_FORMATTING + '\n')
         basecalling_ion(input_dir, out_basecalling_dir, config=args.config, callers=args.num_callers,
                         chunks=2048, threads=args.threads, records=args.records_per_fastq)
 
     # Barcoding
 
+    logger.info('\n' + GREEN + "STARTING BARCODING" + END_FORMATTING)
+
     if os.path.isfile(barcoding_summary):
-        logger.info("\n" + YELLOW + "Ommiting BARCODING/DEMULTIPLEX" +
-                    END_FORMATTING + "\n")
+        logger.info('\n' + YELLOW + BOLD + "Ommiting BARCODING/DEMULTIPLEX" +
+                    END_FORMATTING + '\n')
     else:
-        logger.info("\n" + GREEN + "STARTING BARCODING/DEMULTIPLEX" +
-                    END_FORMATTING + "\n")
+        logger.info('\n' + GREEN + "STARTING BARCODING/DEMULTIPLEX" +
+                    END_FORMATTING + '\n')
         barcoding_ion(out_basecalling_dir, out_barcoding_dir, barcode_kit=args.barcode_kit,
                       threads=args.threads, require_barcodes_both_ends=args.require_barcodes_both_ends)
 
     # Read Filtering
 
-    logger.info("\n" + GREEN + "STARTING SAMPLE FILTERING" + END_FORMATTING)
+    logger.info('\n' + GREEN + "STARTING SAMPLE FILTERING" + END_FORMATTING)
 
-    logger.info("\n" + BLUE + "SAMPLE RENAMING" + "\n" + END_FORMATTING)
+    logger.info('\n' + BLUE + "SAMPLE RENAMING" + '\n' + END_FORMATTING)
 
     rename_files(out_barcoding_dir, out_samples_dir, summary=args.samples)
 
     logger.info(BLUE + "SAMPLE QC FILTERING" +
-                "\n" + END_FORMATTING)
+                '\n' + END_FORMATTING)
 
     ONT_filtering(out_samples_dir, out_samples_filtered_dir)
 
     # Quality Check
 
-    logger.info("\n" + GREEN + "QUALITY CHECK IN RAW" + "\n" + END_FORMATTING)
+    logger.info('\n' + GREEN + "QUALITY CHECK IN RAW" + '\n' + END_FORMATTING)
 
     ONT_quality(out_samples_filtered_dir, out_qc_dir, threads=args.threads)
 
     # MinION data correction
 
-    # logger.info("\n" + GREEN + "MinION data correction" + END_FORMATTING)
+    # logger.info('\n' + GREEN + "MinION data correction" + END_FORMATTING)
 
-    logger.info("\n" + MAGENTA + BOLD +
-                "##### END OF ONT DATA PROCESSING PIPELINE #####" + "\n" + END_FORMATTING)
+    logger.info('\n' + MAGENTA + BOLD +
+                "##### END OF ONT DATA PROCESSING PIPELINE #####" + '\n' + END_FORMATTING)
