@@ -246,7 +246,7 @@ if __name__ == '__main__':
 
     ############### START PIPELINE ###############
 
-    # Mapping with minimap2, sorting Bam and indexing it
+    # Mapping with minimap2, sorting Bam and indexing it (also can be made with bwa index & bwa mem -x ont2d)
 
     logger.info('\n' + GREEN + "STARTING SAMPLE MAPPING" +
                 '\n' + END_FORMATTING)
@@ -254,7 +254,7 @@ if __name__ == '__main__':
     minimap2_mapping(in_samples_filtered_dir, out_bam_dir,
                      reference=args.reference, threads=args.threads)
 
-    # Variant calling with freebayes-parallel
+    # Variant calling with freebayes-parallel (also can be made with nanopolish, we should use nanopolish index & nanopolish variants)
 
     logger.info('\n' + GREEN + "STARTING VARIANT CALLING" +
                 '\n' + END_FORMATTING)
