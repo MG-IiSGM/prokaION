@@ -70,7 +70,7 @@ def get_arguments():
     input_group.add_argument('-t', '--threads', type=int, dest='threads', required=False,
                              default=30, help='Threads to use (30 threads by default)')
 
-    input_group.add_argument('--chunks', type=int, dest='chunks', required=False, default=100000,
+    input_group.add_argument('--chunks', type=int, dest='chunks', required=False, default=144679,
                              help='Generate regions that are equal in terms of data content, and thus have lower variance in runtime')
 
     output_group = parser.add_argument_group(

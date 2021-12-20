@@ -206,7 +206,7 @@ def samtools_faidx(reference):
         execute_subprocess(cmd_faidx, isShell=False)
 
 
-def create_reference_chunks(reference, num_chunks=100000):
+def create_reference_chunks(reference, num_chunks=144679):
 
     input_reference = os.path.abspath(reference)
     input_folder = os.path.dirname(reference)
