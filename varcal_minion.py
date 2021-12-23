@@ -52,11 +52,8 @@ def get_arguments():
 
     input_group = parser.add_argument_group('Input', 'Input parameters')
 
-    input_group.add_argument('-i', '--input', dest='input_dir', metavar='input_directory',
+    input_group.add_argument('-i', '--input', dest='input_dir', metavar='Input_directory',
                              type=str, required=True, help='REQUIRED. Input directory containing all fastq files')
-
-    input_group.add_argument('-r', '--reference', metavar='reference',
-                             type=str, required=True, help='REQUIRED. File to map against')
 
     input_group.add_argument('-s', '--sample', metavar='sample', type=str,
                              required=False, help='Sample to identify further files')
@@ -70,8 +67,32 @@ def get_arguments():
     input_group.add_argument('-t', '--threads', type=int, dest='threads', required=False,
                              default=30, help='Threads to use (30 threads by default)')
 
-    input_group.add_argument('--chunks', type=int, dest='chunks', required=False, default=144679,
-                             help='Generate regions that are equal in terms of data content, and thus have lower variance in runtime')
+    variant_group = parser.add_argument_group(
+        'Variant Calling', 'Variant Calling parameters')
+
+    variant_group.add_argument('-B', '--bayes', required=False, action='store_true',
+                               help='Variant Calling is done with freebayes-parallel')
+
+    variant_group.add_argument('-f', '--min_allele_frequency', type=int, dest='min_frequency', required=False,
+                               default=0.1, help='Minimum fraction of observations supporting an alternate allele. Default: 0.1')
+
+    variant_group.add_argument('-q', '--min_base_quality', type=int, dest='min_quality', required=False,
+                               default=7, help='Exclude alleles from analysis below threshold. Default: 7')
+
+    variant_group.add_argument('-m', '--min_mapping_quality', type=int, dest='min_mapping', required=False,
+                               default=10, help='Exclude alignments from analysis below threshold. Default: 10')
+
+    reference_group = parser.add_argument_group(
+        'Reference', 'Reference parameters')
+
+    reference_group.add_argument('-r', '--reference', metavar='Reference',
+                                 type=str, required=True, help='REQUIRED. File to map against')
+
+    reference_group.add_argument('--ploidy', type=int, dest='ploidy', required=False,
+                                 default=1, help='Sets the default ploidy for the analysis')
+
+    reference_group.add_argument('--chunks', type=int, dest='chunks', required=False, default=144679,
+                                 help='Generate regions that are equal in terms of data content, and thus have lower variance in runtime')
 
     output_group = parser.add_argument_group(
         'Output', 'Required parameter to output results')
@@ -119,7 +140,7 @@ def get_arguments():
 #                 execute_subprocess(cmd_snippy, isShell=False)
 
 
-def minimap2_mapping(out_samples_filtered_dir, out_sorted_bam, reference, threads=30):
+def minimap2_mapping(out_samples_filtered_dir, out_sorted_bam, reference):
     """
     https://github.com/lh3/minimap2
         # Oxford Nanopore genomic reads
@@ -168,6 +189,9 @@ def minimap2_mapping(out_samples_filtered_dir, out_sorted_bam, reference, thread
                 cmd_indexing = 'samtools', 'index', filename_bam_out
                 # print(cmd_indexing)
                 execute_subprocess(cmd_indexing, isShell=False)
+
+
+# def freebayes_variant(reference, input_bam, output_variant, sample, num_chunks=100000, threads=36):
 
 
 if __name__ == '__main__':
@@ -244,6 +268,23 @@ if __name__ == '__main__':
     out_bam_dir = os.path.join(output_dir, 'Bam')
     check_create_dir(out_bam_dir)
 
+    out_variant_dir = os.path.join(output_dir, 'Variants')
+    check_create_dir(out_variant_dir)
+
+    out_stats_dir = os.path.join(output_dir, "Stats")
+    out_stats_bamstats_dir = os.path.join(
+        out_stats_dir, "Bamstats")  # subfolder
+    out_stats_coverage_dir = os.path.join(
+        out_stats_dir, "Coverage")  # subfolder
+
+    out_compare_dir = os.path.join(output_dir, "Compare")
+
+    out_annot_dir = os.path.join(output_dir, "Annotation")
+    out_annot_snpeff_dir = os.path.join(out_annot_dir, "snpeff")  # subfolder
+    out_annot_user_dir = os.path.join(out_annot_dir, "user")  # subfolder
+    out_annot_user_aa_dir = os.path.join(out_annot_dir, "user_aa")  # subfolder
+    out_annot_blast_dir = os.path.join(out_annot_dir, "blast")  # subfolder
+
     ############### START PIPELINE ###############
 
     # Mapping with minimap2, sorting Bam and indexing it (also can be made with bwa index & bwa mem -x ont2d)
@@ -252,7 +293,7 @@ if __name__ == '__main__':
                 '\n' + END_FORMATTING)
 
     minimap2_mapping(in_samples_filtered_dir, out_bam_dir,
-                     reference=args.reference, threads=args.threads)
+                     reference=args.reference)
 
     # Variant calling with freebayes-parallel (also can be made with nanopolish, we should use nanopolish index & nanopolish variants)
 
@@ -265,3 +306,6 @@ if __name__ == '__main__':
 
     logger.info('\n' + MAGENTA + BOLD +
                 '##### END OF ONT VARIANT CALLING PIPELINE #####' + '\n' + END_FORMATTING)
+
+
+# freebayes-parallel /home/laura/DATABASES/REFERENCES/ancestorII/reference.144679.regions 36 -f /home/laura/DATABASES/REFERENCES/ancestorII/MTB_ancestorII_reference.fa --haplotype-length 0 --use-best-n-alleles 1 --min-alternate-count 0 --min-alternate-fraction 0 -p 1 --min-coverage 1 -F 0.1 -q 7 -m 5 --strict-vcf BC09.sort.bam > BC09-BIS.freebayes

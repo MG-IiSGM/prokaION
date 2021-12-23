@@ -202,6 +202,7 @@ def samtools_faidx(reference):
     if os.path.isfile(fai_reference):
         logger.info(fai_reference + " already EXISTS")
     else:
+        logger.info(GREEN + "Indexing " + fai_reference + END_FORMATTING)
         cmd_faidx = 'samtools', 'faidx', reference
         execute_subprocess(cmd_faidx, isShell=False)
 
@@ -217,6 +218,9 @@ def create_reference_chunks(reference, num_chunks=144679):
     if os.path.isfile(out_reference_file):
         logger.info(out_reference_file + " already EXISTS")
     else:
+        logger.info(GREEN + "Creating " + out_reference_file + END_FORMATTING)
         cmd_chunks = "fasta_generate_regions.py {} {} > {}".format(
             fai_reference, num_chunks, out_reference_file)
         execute_subprocess(cmd_chunks, isShell=True)
+
+    return out_reference_file
