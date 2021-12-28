@@ -11,6 +11,8 @@ import pandas as pd
 import numpy as np
 from statistics import mean
 import multiprocessing
+import concurrent.futures
+from pandarallel import pandarallel
 
 
 logger = logging.getLogger()
@@ -311,6 +313,174 @@ def create_coverage(input_bam, output_file):
     cmd_coverage = "samtools depth -aa {} > {}".format(input_bam, output_file)
     # print(cmd_coverage)
     execute_subprocess(cmd_coverage, isShell=True)
+
+
+def calculate_cov_stats(file_cov):
+    sample = file_cov.split("/")[-1].split(".")[0]
+    df = pd.read_csv(file_cov, sep="\t", names=["#CHROM", "POS", "COV"])
+    unmmaped_pos = len(df.POS[df.COV == 0].tolist())
+    pos_0_10 = len(df.POS[(df.COV > 0) & (df.COV <= 10)].tolist())
+    pos_10_20 = len(df.POS[(df.COV > 10) & (df.COV <= 20)].tolist())
+    pos_high20 = len(df.POS[(df.COV > 20)].tolist())
+    pos_high50 = len(df.POS[(df.COV > 50)].tolist())
+    pos_high100 = len(df.POS[(df.COV >= 100)].tolist())
+    pos_high500 = len(df.POS[(df.COV >= 500)].tolist())
+    pos_high1000 = len(df.POS[(df.COV >= 1000)].tolist())
+    total_pos = df.shape[0]
+    unmmaped_prop = "%.2f" % ((unmmaped_pos/total_pos)*100)
+    prop_0_10 = "%.2f" % ((pos_0_10/total_pos)*100)
+    prop_10_20 = "%.2f" % ((pos_10_20/total_pos)*100)
+    prop_high20 = "%.2f" % ((pos_high20/total_pos)*100)
+    prop_high50 = "%.2f" % ((pos_high50/total_pos)*100)
+    prop_high100 = "%.2f" % ((pos_high100/total_pos)*100)
+    prop_high500 = "%.2f" % ((pos_high500/total_pos)*100)
+    prop_high1000 = "%.2f" % ((pos_high1000/total_pos)*100)
+
+    mean_cov = "%.2f" % (df.COV.mean())
+
+    return sample, mean_cov, unmmaped_prop, prop_0_10, prop_10_20, prop_high20, prop_high50, prop_high100, prop_high500, prop_high1000
+
+
+def obtain_group_cov_stats(directory, group_name):
+
+    directory_path = os.path.abspath(directory)
+    samples_to_skip = []
+    previous_stat = False
+
+    output_group_name = group_name + ".coverage.summary.tab"
+    output_file = os.path.join(directory_path, output_group_name)
+
+    if os.path.exists(output_file):
+        previous_stat = True
+        df_stat = pd.read_csv(output_file, sep="\t")
+        samples_to_skip = df_stat["#SAMPLE"].tolist()
+        logger.debug("Skipped samples for coverage calculation:" +
+                     (",").join(samples_to_skip))
+
+    columns = ["#SAMPLE", "MEAN_COV", "UNMMAPED_PROP", "COV1-10X",
+               "COV10-20X", "COV>20X", "COV>50X", "COV>100X", "COV>500X", "COV>1000X"]
+
+    files_list = []
+
+    for root, _, files in os.walk(directory):
+        for name in files:
+            if name.endswith('.cov'):
+                filename = os.path.join(root, name)
+                sample = name.split(".")[0]
+                #df[columns] = df.apply(calculate_cov_stats(filename), axis=1, result_type="expand")
+                if not sample in samples_to_skip:
+                    files_list.append(filename)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+        dfs = executor.map(calculate_cov_stats, files_list)
+    df = pd.DataFrame(dfs, columns=columns)
+
+    if previous_stat:
+        df = pd.concat([df_stat, df], ignore_index=True, sort=True)
+        df.to_csv(output_file, sep="\t", index=False)
+    else:
+        df.to_csv(output_file, sep="\t", index=False)
+
+
+def extract_snp_count(out_variant_dir, sample):
+
+    sample = str(sample)
+    if '.' in sample:
+        sample = sample.split('.')[0]
+
+    raw_var_folder = os.path.join(out_variant_dir, sample)
+    filename = os.path.join(raw_var_folder, "snps.all.ivar.tsv")
+
+    if os.path.exists(filename):
+        df = pd.read_csv(filename, sep="\t")
+        df = df.drop_duplicates(subset=['POS', 'REF', 'ALT'], keep="first")
+        high_quality_snps = df["POS"][(df.ALT_DP >= 20) &
+                                      (df.ALT_FREQ >= 0.8) &
+                                      (df.TYPE == 'snp')].tolist()
+        htz_snps = df["POS"][(df.ALT_DP >= 20) &
+                             (df.ALT_FREQ < 0.8) &
+                             (df.ALT_FREQ >= 0.2) &
+                             (df.TYPE == 'snp')].tolist()
+        indels = df["POS"][(df.ALT_DP >= 20) &
+                           (df.ALT_FREQ >= 0.8) &
+                           ((df.TYPE == 'ins') | (df.TYPE == 'del'))].tolist()
+        return (len(high_quality_snps), len(htz_snps), len(indels))
+    else:
+        logger.debug("FILE " + filename + " NOT FOUND")
+        return None
+
+
+def extract_mapped_reads(out_stats_bamstats_dir, sample):
+
+    sample = str(sample)
+    if '.' in sample:
+        sample = sample.split('.')[0]
+    filename = os.path.join(out_stats_bamstats_dir, sample + ".bamstats")
+
+    if os.path.exists(filename):
+        reads_mapped = 0
+        mappep_percentage = 0
+        properly_paired = 0
+        paired_percentage = 0
+        with open(filename, 'r') as f:
+            logger.debug('File bamstat: {}'.format(filename))
+            for line in f:
+                if 'mapped' in line and '%' in line:
+                    reads_mapped = line.split(" ")[0]
+                    mappep_percentage = line.split("(")[-1].split("%")[0]
+                elif 'properly paired' in line:
+                    properly_paired = line.split(" ")[0]
+                    paired_percentage = line.split("(")[-1].split("%")[0]
+
+        # logger.debug((",").join(
+        #     [reads_mapped, mappep_percentage, properly_paired, paired_percentage]))
+
+        # logger.debug(len([x for x in [reads_mapped, mappep_percentage,
+        #                               properly_paired, paired_percentage] if x != 0]))
+
+        if len([x for x in [reads_mapped, mappep_percentage, properly_paired, paired_percentage] if x != 0]):
+            return int(reads_mapped), float(mappep_percentage), int(properly_paired), float(paired_percentage)
+        else:
+            return 0, 0, 0, 0
+    else:
+        logger.info("FILE " + filename + " NOT FOUND")
+        return None
+
+
+def obtain_overal_stats(out_stats_dir, group):
+    pandarallel.initialize()
+
+    samples_to_skip = []
+    previous_stat = False
+
+    overal_stat_file = os.path.join(out_stats_dir, group + ".overal.stats.tab")
+
+    if os.path.exists(overal_stat_file):
+        previous_stat = True
+        df_stat = pd.read_csv(overal_stat_file, sep="\t")
+        samples_to_skip = df_stat["#SAMPLE"].tolist()
+        logger.debug("Skipped samples for coverage calculation:" +
+                     (",").join(samples_to_skip))
+
+    for root, _, files in os.walk(out_stats_dir):
+        for name in files:
+            if name.endswith('coverage.summary.tab'):
+                filename = os.path.join(root, name)
+                df = pd.read_csv(filename, sep="\t")
+                df = df[~df["#SAMPLE"].isin(samples_to_skip)]
+                if df.shape[0] > 0:
+                    df[['HQ_SNP', 'HTZ_SNP', 'INDELS']] = df.parallel_apply(lambda x: extract_snp_count(
+                        out_stats_dir, x['#SAMPLE']), axis=1, result_type="expand")
+                    df[['mapped_reads', 'perc_mapped', 'paired_mapped', 'perc_paired']] = df.parallel_apply(
+                        lambda x: extract_mapped_reads(out_stats_dir, x['#SAMPLE']), axis=1, result_type="expand")
+                    # df[['N_groups', 'N_individual', 'N_leading', 'N_tailing', 'N_sum_len', 'N_total_perc', 'N_mean_len']] = df.parallel_apply(
+                    # lambda x: extract_n_consensus(out_stats_dir, x['#SAMPLE']), axis=1, result_type="expand")
+
+    if previous_stat:
+        df = pd.concat([df_stat, df], ignore_index=True, sort=True)
+        df.to_csv(overal_stat_file, sep="\t", index=False)
+    else:
+        df.to_csv(overal_stat_file, sep="\t", index=False)
 
 
 ### VCF processing ###

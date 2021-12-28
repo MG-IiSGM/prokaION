@@ -13,7 +13,7 @@ import multiprocessing
 
 # Local application imports
 
-from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list, samtools_faidx, create_reference_chunks, extract_indels, merge_vcf, vcf_to_ivar_tsv, create_bamstat, create_coverage
+from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list, samtools_faidx, create_reference_chunks, extract_indels, merge_vcf, vcf_to_ivar_tsv, create_bamstat, create_coverage, obtain_group_cov_stats, obtain_overal_stats
 
 
 logger = logging.getLogger()
@@ -427,7 +427,8 @@ if __name__ == '__main__':
                     HQ_filename, filename_bam_out, reference=args.reference)
 
             after = datetime.datetime.now()
-            print(("Done with function in: %s" % (after - prior) + '\n'))
+            print(("Done with function minimap2_mapping in: %s" %
+                  (after - prior) + '\n'))
 
     ##### VARIANT CALLING #####
 
@@ -455,7 +456,7 @@ if __name__ == '__main__':
                                       frequency=args.min_frequency, base_qual=args.min_quality, map_qual=args.min_mapping)
 
                 after = datetime.datetime.now()
-                print(("Done with function in: %s" %
+                print(("Done with function freebayes_variant in: %s" %
                       (after - prior) + '\n'))
 
     # Filtering the raw variant calling by quality, depth and frequency with bcftools. Also extracting complex variations and MNP with snippy-vcf_extract_subs
@@ -482,7 +483,7 @@ if __name__ == '__main__':
                     snippy_sub(output_vcf, output_vcf_sub)
 
                 after = datetime.datetime.now()
-                print(("Done with function in: %s" %
+                print(("Done with function bcftools_filter & snippy_sub in: %s" %
                       (after - prior) + '\n'))
 
     # Variant format combination, extracting INDELs and combining with subs.vcf (SNPs, MNPs and complex)
@@ -513,7 +514,8 @@ if __name__ == '__main__':
                     merge_vcf(output_vcf_sub, out_variant_indel_sample)
 
                 after = datetime.datetime.now()
-                print(("Done with function in: %s" % (after - prior) + '\n'))
+                print(("Done with function extract_indels & merge_vcf in: %s" %
+                      (after - prior) + '\n'))
 
     # Variant format adaptation
 
@@ -533,7 +535,8 @@ if __name__ == '__main__':
                                     out_variant_tsv_file)
 
                 after = datetime.datetime.now()
-                print(("Done with function in: %s" % (after - prior) + '\n'))
+                print(("Done with function vcf_to_ivar_tsv in: %s" %
+                      (after - prior) + '\n'))
 
     ##### CREATE STATS AND QUALITY FILTERS #####
 
@@ -557,7 +560,8 @@ if __name__ == '__main__':
                 filename_bam_out, out_bamstats_file, threads=args.threads)
 
         after = datetime.datetime.now()
-        print(("Done with function in: %s" % (after - prior) + '\n'))
+        print(("Done with function create_bamstat in: %s" %
+              (after - prior) + '\n'))
 
     # Create Coverage
 
@@ -577,7 +581,26 @@ if __name__ == '__main__':
             create_coverage(filename_bam_out, out_coverage_file)
 
         after = datetime.datetime.now()
-        print(("Done with function in: %s" % (after - prior) + '\n'))
+        print(("Done with function create_coverage in: %s" %
+              (after - prior) + '\n'))
+
+    # Coverage Output summary
+
+    prior = datetime.datetime.now()
+
+    logger.info(GREEN + BOLD + 'Creating summary report for coverage results in group ' +
+                group_name + END_FORMATTING)
+    obtain_group_cov_stats(out_stats_dir, group_name)
+
+    # Reads and Variants output summary
+
+    logger.info(GREEN + BOLD + 'Creating overal summary report in group ' +
+                group_name + END_FORMATTING)
+    obtain_overal_stats(out_stats_dir, group_name)
+
+    after = datetime.datetime.now()
+    print(("Done with function obtain_group_cov_stats in: %s" %
+          (after - prior) + '\n'))
 
     logger.info('\n' + MAGENTA + BOLD +
                 '##### END OF ONT VARIANT CALLING PIPELINE #####' + '\n' + END_FORMATTING)
