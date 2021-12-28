@@ -10,6 +10,7 @@ import datetime
 import pandas as pd
 import numpy as np
 from statistics import mean
+import multiprocessing
 
 
 logger = logging.getLogger()
@@ -204,6 +205,27 @@ def file_to_list(file_name):
 
 ### Processing Reference files ###
 
+def optimal_chunk_size(reference):
+    """
+    https://www.bioinformatics.nl/emboss-explorer/
+        http://www.sacs.ucsf.edu/Documentation/emboss/infoseq.html
+    """
+
+    input_reference = os.path.abspath(reference)
+    input_folder = os.path.dirname(reference)
+    chunks_size = 'chunks_size'
+    chunks_size_path = os.path.join(input_folder, 'chunks_size')
+
+    cmd_infoseq = ['infoseq', '-auto', '-only',
+                   '-length', '-noheading', '-odirectory', input_folder, '-outfile', chunks_size, input_reference]
+    # print(cmd_infoseq)
+    execute_subprocess(cmd_infoseq, isShell=False)
+
+    df = pd.read_csv(chunks_size_path, header=None)
+    size = df.loc[df.index[0]]
+    return size
+
+
 def samtools_faidx(reference):
     # samtools faidx reference.fa
 
@@ -218,7 +240,13 @@ def samtools_faidx(reference):
         execute_subprocess(cmd_faidx, isShell=False)
 
 
-def create_reference_chunks(reference, num_chunks=144679):
+def create_reference_chunks(reference):
+
+    ref_size = optimal_chunk_size(reference)
+    min_freebayes_chunk_size = 1000
+    chunk_cpu = multiprocessing.cpu_count()-2
+    num_chunks = round(
+        max(min_freebayes_chunk_size, int(ref_size) / chunk_cpu))
 
     input_reference = os.path.abspath(reference)
     input_folder = os.path.dirname(reference)
@@ -268,6 +296,21 @@ def merge_vcf(snp_vcf, indel_vcf):
             for line in f2:
                 if not line.startswith("#"):
                     fout.write(line)
+
+
+def create_bamstat(input_bam, output_file, threads=36):
+
+    cmd_bamstat = "samtools flagstat --threads {} {} > {}".format(
+        str(threads), input_bam, output_file)
+    # print(cmd_bamstat)
+    execute_subprocess(cmd_bamstat, isShell=True)
+
+
+def create_coverage(input_bam, output_file):
+
+    cmd_coverage = "samtools depth -aa {} > {}".format(input_bam, output_file)
+    # print(cmd_coverage)
+    execute_subprocess(cmd_coverage, isShell=True)
 
 
 ### VCF processing ###

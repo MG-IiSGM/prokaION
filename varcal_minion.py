@@ -8,10 +8,12 @@ import sys
 import subprocess
 import datetime
 import gzip
+import multiprocessing
+
 
 # Local application imports
 
-from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list, samtools_faidx, create_reference_chunks, extract_indels, merge_vcf, vcf_to_ivar_tsv
+from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list, samtools_faidx, create_reference_chunks, extract_indels, merge_vcf, vcf_to_ivar_tsv, create_bamstat, create_coverage
 
 
 logger = logging.getLogger()
@@ -65,7 +67,7 @@ def get_arguments():
                              required=False, help='Bed file including primers to trim')
 
     input_group.add_argument('-t', '--threads', type=int, dest='threads', required=False,
-                             default=30, help='Threads to use (30 threads by default)')
+                             default=36, help='Threads to use (36 threads by default)')
 
     variant_group = parser.add_argument_group(
         'Variant Calling', 'Variant Calling parameters')
@@ -77,10 +79,10 @@ def get_arguments():
                                default=0.1, help='Minimum fraction of observations supporting an alternate allele. Default: 0.1')
 
     variant_group.add_argument('-q', '--min_base_quality', type=int, dest='min_quality', required=False,
-                               default=7, help='Exclude alleles from analysis below threshold. Default: 7')
+                               default=10, help='Exclude alleles from analysis below threshold. Default: 10')
 
     variant_group.add_argument('-m', '--min_mapping_quality', type=int, dest='min_mapping', required=False,
-                               default=10, help='Exclude alignments from analysis below threshold. Default: 10')
+                               default=60, help='Exclude alignments from analysis below threshold. Default: 60')
 
     reference_group = parser.add_argument_group(
         'Reference', 'Reference parameters')
@@ -90,9 +92,6 @@ def get_arguments():
 
     reference_group.add_argument('--ploidy', type=int, dest='ploidy', required=False,
                                  default=1, help='Sets the default ploidy for the analysis')
-
-    reference_group.add_argument('--chunks', type=int, dest='chunks', required=False, default=144679,
-                                 help='Generate regions that are equal in terms of data content, and thus have lower variance in runtime')
 
     output_group = parser.add_argument_group(
         'Output', 'Required parameter to output results')
@@ -105,7 +104,7 @@ def get_arguments():
     return arguments
 
 
-# def run_snippy(input_sample_dir, reference, out_variant_dir, threads=30, minqual=10, minfrac=0.1, mincov=1):
+# def run_snippy(input_sample_dir, reference, out_variant_dir, threads=36, minqual=10, minfrac=0.1, mincov=1):
 #     """
 #     https://github.com/tseemann/snippy
 #     USAGE
@@ -173,7 +172,7 @@ def minimap2_mapping(HQ_filename, filename_bam_out, reference):
     execute_subprocess(cmd_indexing, isShell=False)
 
 
-def freebayes_variant(reference, filename_bam_out, output_vcf, num_chunks=100000, threads=36, frequency=0.1, base_qual=7, map_qual=5):
+def freebayes_variant(reference, filename_bam_out, output_vcf, threads=36, frequency=0.1, base_qual=7, map_qual=5):
     """
     https://github.com/freebayes/freebayes
         # Freebayes-parallel
@@ -192,7 +191,7 @@ def freebayes_variant(reference, filename_bam_out, output_vcf, num_chunks=100000
     # --strict-vcf: Generate strict VCF format (FORMAT/GQ will be an int)
 
     region_file = create_reference_chunks(
-        reference, num_chunks=str(num_chunks))
+        reference)
 
     # for root, _, files in os.walk(out_bam_dir):
     #     for name in files:
@@ -344,22 +343,31 @@ if __name__ == '__main__':
     check_create_dir(out_variant_dir)
 
     out_stats_dir = os.path.join(output_dir, "Stats")
+    check_create_dir(out_stats_dir)
     out_stats_bamstats_dir = os.path.join(
         out_stats_dir, "Bamstats")  # subfolder
+    check_create_dir(out_stats_bamstats_dir)
     out_stats_coverage_dir = os.path.join(
         out_stats_dir, "Coverage")  # subfolder
+    check_create_dir(out_stats_coverage_dir)
 
     out_compare_dir = os.path.join(output_dir, "Compare")
+    check_create_dir(out_compare_dir)
 
     out_annot_dir = os.path.join(output_dir, "Annotation")
+    check_create_dir(out_annot_dir)
     out_annot_snpeff_dir = os.path.join(out_annot_dir, "snpeff")  # subfolder
+    check_create_dir(out_annot_snpeff_dir)
     out_annot_user_dir = os.path.join(out_annot_dir, "user")  # subfolder
+    check_create_dir(out_annot_user_dir)
     out_annot_user_aa_dir = os.path.join(out_annot_dir, "user_aa")  # subfolder
+    check_create_dir(out_annot_user_aa_dir)
     out_annot_blast_dir = os.path.join(out_annot_dir, "blast")  # subfolder
+    check_create_dir(out_annot_blast_dir)
 
     samtools_faidx(args.reference)
 
-    create_reference_chunks(args.reference, num_chunks=args.chunks)
+    create_reference_chunks(args.reference)
 
     ############### START PIPELINE ###############
 
@@ -443,7 +451,7 @@ if __name__ == '__main__':
                 else:
                     logger.info(
                         GREEN + 'Starting Variant Calling for sample ' + filename_out + END_FORMATTING)
-                    freebayes_variant(args.reference, filename_bam_out, output_raw_vcf, num_chunks=args.chunks, threads=args.threads,
+                    freebayes_variant(args.reference, filename_bam_out, output_raw_vcf, threads=args.threads,
                                       frequency=args.min_frequency, base_qual=args.min_quality, map_qual=args.min_mapping)
 
                 after = datetime.datetime.now()
@@ -526,6 +534,50 @@ if __name__ == '__main__':
 
                 after = datetime.datetime.now()
                 print(("Done with function in: %s" % (after - prior) + '\n'))
+
+    ##### CREATE STATS AND QUALITY FILTERS #####
+
+    # Create Bamstats
+
+        out_bamstats_name = filename_out + ".bamstats"
+        out_bamstats_file = os.path.join(
+            out_stats_bamstats_dir, out_bamstats_name)
+        # print(out_bamstats_file)
+        # print(filename_bam_out)
+
+        prior = datetime.datetime.now()
+
+        if os.path.isfile(out_bamstats_file):
+            logger.info(YELLOW + out_bamstats_file +
+                        'EXIST\nOmmiting Bamstats for ' + filename_out + END_FORMATTING)
+        else:
+            logger.info(GREEN + 'Creating Bamstats in sample ' +
+                        filename_out + END_FORMATTING)
+            create_bamstat(
+                filename_bam_out, out_bamstats_file, threads=args.threads)
+
+        after = datetime.datetime.now()
+        print(("Done with function in: %s" % (after - prior) + '\n'))
+
+    # Create Coverage
+
+        out_coverage_name = filename_out + ".cov"
+        out_coverage_file = os.path.join(
+            out_stats_coverage_dir, out_coverage_name)
+        # print(out_coverage_file)
+
+        prior = datetime.datetime.now()
+
+        if os.path.isfile(out_coverage_file):
+            logger.info(YELLOW + out_coverage_file +
+                        ' EXIST\nOmmiting Coverage for ' + filename_out + END_FORMATTING)
+        else:
+            logger.info(GREEN + 'Creating Coverage in sample ' +
+                        filename_out + END_FORMATTING)
+            create_coverage(filename_bam_out, out_coverage_file)
+
+        after = datetime.datetime.now()
+        print(("Done with function in: %s" % (after - prior) + '\n'))
 
     logger.info('\n' + MAGENTA + BOLD +
                 '##### END OF ONT VARIANT CALLING PIPELINE #####' + '\n' + END_FORMATTING)
