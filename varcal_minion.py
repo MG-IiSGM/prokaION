@@ -11,7 +11,7 @@ import gzip
 
 # Local application imports
 
-from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list, samtools_faidx, create_reference_chunks
+from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list, samtools_faidx, create_reference_chunks, extract_indels, merge_vcf, vcf_to_ivar_tsv
 
 
 logger = logging.getLogger()
@@ -140,12 +140,11 @@ def get_arguments():
 #                 execute_subprocess(cmd_snippy, isShell=False)
 
 
-def minimap2_mapping(out_samples_filtered_dir, out_sorted_bam, reference):
+def minimap2_mapping(HQ_filename, filename_bam_out, reference):
     """
     https://github.com/lh3/minimap2
         # Oxford Nanopore genomic reads
         minimap2 -ax map-ont ref.fa ont.fq.gz > aln.sam
-
     http://www.htslib.org/doc/samtools.html
     """
 
@@ -164,34 +163,100 @@ def minimap2_mapping(out_samples_filtered_dir, out_sorted_bam, reference):
     # -F: Only include reads with none of the FLAGS in INT present
     # --threads: Number of additional threads to use
 
-    for root, _, files in os.walk(out_samples_filtered_dir):
-        for name in files:
-            HQ_filename = os.path.join(root, name)
-            filename_out = name.split('.')[0].split('_')[1]
-            # print(filename_out)
-            filename_bam_out = os.path.join(
-                out_sorted_bam, filename_out + '.sort.bam')
-            filename_bai_out = os.path.join(
-                out_sorted_bam, filename_out + '.sort.bam.bai')
-            # print(filename_bam_out)
+    cmd_minimap2 = 'minimap2 -ax map-ont {} {} | samtools view -bS -F 4 - | samtools sort -o {}'.format(
+        reference, HQ_filename, filename_bam_out)
+    # print(cmd_minimap2)
+    execute_subprocess(cmd_minimap2, isShell=True)
 
-            if os.path.isfile(filename_bai_out):
-                logger.info(YELLOW + BOLD + filename_bam_out +
-                            ' EXIST\nOmmiting filtering for sample ' + filename_out + '\n' + END_FORMATTING)
-            else:
-                logger.info(GREEN + 'Mapping sample ' +
-                            filename_out + END_FORMATTING)
-                cmd_minimap2 = 'minimap2 -ax map-ont {} {} | samtools view -bS -F 4 - | samtools sort -o {}'.format(
-                    reference, HQ_filename, filename_bam_out)
-                # print(cmd_minimap2)
-                execute_subprocess(cmd_minimap2, isShell=True)
-
-                cmd_indexing = 'samtools', 'index', filename_bam_out
-                # print(cmd_indexing)
-                execute_subprocess(cmd_indexing, isShell=False)
+    cmd_indexing = 'samtools', 'index', filename_bam_out
+    # print(cmd_indexing)
+    execute_subprocess(cmd_indexing, isShell=False)
 
 
-# def freebayes_variant(reference, input_bam, output_variant, sample, num_chunks=100000, threads=36):
+def freebayes_variant(reference, filename_bam_out, output_vcf, num_chunks=100000, threads=36, frequency=0.1, base_qual=7, map_qual=5):
+    """
+    https://github.com/freebayes/freebayes
+        # Freebayes-parallel
+        freebayes-parallel <(fasta_generate_regions.py {fai_reference} {chunks}) {threads} {args} > {output}
+    """
+
+    # region_file:
+    # --haplotype_length: Allow haplotype calls with contiguous embedded matches of up to this length
+    # --use-best-n-alleles: Evaluate only the best N SNP alleles, ranked by sum of supporting quality scores
+    # --min-alternate-count: Require at least this count of observations supporting an alternate allele within a single individual in order to evaluate the position
+    # --min-alternate-fraction: Require at least this fraction of observations supporting an alternate allele within a single individual in the in order to evaluate the position
+    # -p: Sets the default ploidy for the analysis to N
+    # --min-coverage:
+    # -q: Exclude alleles from analysis if their supporting base quality is less than Q
+    # -m: Exclude alignments from analysis if they have a mapping quality less than Q
+    # --strict-vcf: Generate strict VCF format (FORMAT/GQ will be an int)
+
+    region_file = create_reference_chunks(
+        reference, num_chunks=str(num_chunks))
+
+    # for root, _, files in os.walk(out_bam_dir):
+    #     for name in files:
+    #         sample_file = os.path.join(root, name)
+    #         # print(sample_file)
+    #         if sample_file.endswith('bam'):
+    #             # print(sample_file)
+    #             sample_filename = sample_file.split('.')[0].split('/')[-1]
+    #             # print(sample_filename)
+    #             sample_variant_dir = os.path.join(
+    #                 out_variant_dir, sample_filename)
+    #             # print(sample_variant_dir)
+    #             check_create_dir(sample_variant_dir)
+    #             output_vcf = os.path.join(sample_variant_dir, "snps.vcf")
+    #             # print(output_vcf)
+
+    #             if os.path.isfile(output_vcf):
+    #                 logger.info(YELLOW + BOLD + output_vcf +
+    #                             ' EXIST\nOmmiting Variant Calling for sample ' + sample_filename + END_FORMATTING)
+    #             else:
+    #                 logger.info(
+    #                     GREEN + 'Starting Variant Calling for sample ' + sample_filename + END_FORMATTING)
+    cmd_bayes = 'freebayes-parallel {} {} -f {} --haplotype-length 0 --use-best-n-alleles 1 --min-alternate-count 0 --min-alternate-fraction {} -p 1 --min-coverage 1 -q {} -m {} --strict-vcf {} > {}'.format(
+        region_file, str(threads), reference, str(frequency), str(base_qual), str(map_qual), filename_bam_out, output_vcf)
+    print(cmd_bayes)
+    execute_subprocess(cmd_bayes, isShell=True)
+
+
+def bcftool_filter(output_raw_vcf, output_vcf):
+    """
+    https://samtools.github.io/bcftools/bcftools.html
+        # bcftools view: View, subset and filter VCF files by position and filtering expression
+        # bcftools annotate: Add or remove annotations
+    """
+
+    # --include: include sites for which Expression is true
+    # --remove: list of annotations to remove
+
+    # cmd_bcf_view = "bcftools view --include 'QUAL >= 10 && FMT/DP >= 1 && (FMT/AO)/(FMT/DP) >= 0.1' {} -o {}".format(
+    #     output_raw_vcf, output_vcf)
+    # # print(cmd_bcf_view)
+    # execute_subprocess(cmd_bcf_view, isShell=True)
+
+    # cmd_bcf_annot = 'bcftools annotate --remove ^INFO/TYPE,^INFO/DP,^INFO/RO,^INFO/AO,^INFO/AB,^FORMAT/GT,^FORMAT/DP,^FORMAT/RO,^FORMAT/AO,^FORMAT/QR,^FORMAT/QA,^FORMAT/GL {} -o {}'.format(
+    #     output_vcf, output_vcf_filt)
+    # # print(cmd_bcf_annot)
+    # execute_subprocess(cmd_bcf_annot, isShell=True)
+
+    cmd_bcf = "bcftools view --include 'QUAL >= 10 && FMT/DP >= 1 && (FMT/AO)/(FMT/DP) >= 0.1' {} | bcftools annotate --remove ^INFO/TYPE,^INFO/DP,^INFO/RO,^INFO/AO,^INFO/AB,^FORMAT/GT,^FORMAT/DP,^FORMAT/RO,^FORMAT/AO,^FORMAT/QR,^FORMAT/QA,^FORMAT/GL -o {}".format(
+        output_raw_vcf, output_vcf)
+    # print(cmd_bcf)
+    execute_subprocess(cmd_bcf, isShell=True)
+
+
+def snippy_sub(output_vcf_filt, output_vcf_sub):
+    """
+    https://github.com/tseemann/snippy/tree/master/bin
+        # snippy-vcf_extract_subs: Convert MNP,COMPLEX into SNP and ignore INS,DEL
+    """
+
+    cmd_snippy_subs = 'snippy-vcf_extract_subs {} > {}'.format(
+        output_vcf_filt, output_vcf_sub)
+    # print(cmd_snippy_subs)
+    execute_subprocess(cmd_snippy_subs, isShell=True)
 
 
 if __name__ == '__main__':
@@ -248,8 +313,8 @@ if __name__ == '__main__':
         sample = extract_sample_list(sample)
         sample_list.append(sample)
 
-    logger.info('\n' + CYAN + '{} Samples will be analysed: {}'.format(
-        len(sample_list), ', '.join(sample_list)) + END_FORMATTING)
+    # logger.info('\n' + CYAN + '{} Samples will be analysed: {}'.format(
+    #     len(sample_list), ', '.join(sample_list)) + END_FORMATTING)
 
     # Check if there are samples to filter out
 
@@ -262,6 +327,13 @@ if __name__ == '__main__':
     else:
         logger.info('Samples will be filtered')
         sample_list_F = file_to_list(args.sample_list)
+
+    new_samples = check_reanalysis(args.output, sample_list_F)
+
+    logger.info(CYAN + "\n%d samples will be analysed: %s" %
+                (len(sample_list_F), ",".join(sample_list_F)) + END_FORMATTING)
+    logger.info(CYAN + "\n%d NEW samples will be analysed: %s" %
+                (len(new_samples), ",".join(new_samples)) + END_FORMATTING)
 
     # Declare folders created in pipeline and key files
 
@@ -285,27 +357,175 @@ if __name__ == '__main__':
     out_annot_user_aa_dir = os.path.join(out_annot_dir, "user_aa")  # subfolder
     out_annot_blast_dir = os.path.join(out_annot_dir, "blast")  # subfolder
 
-    ############### START PIPELINE ###############
-
-    # Mapping with minimap2, sorting Bam and indexing it (also can be made with bwa index & bwa mem -x ont2d)
-
-    logger.info('\n' + GREEN + "STARTING SAMPLE MAPPING" +
-                '\n' + END_FORMATTING)
-
-    minimap2_mapping(in_samples_filtered_dir, out_bam_dir,
-                     reference=args.reference)
-
-    # Variant calling with freebayes-parallel (also can be made with nanopolish, we should use nanopolish index & nanopolish variants)
-
-    logger.info('\n' + GREEN + "STARTING VARIANT CALLING" +
-                '\n' + END_FORMATTING)
-
     samtools_faidx(args.reference)
 
     create_reference_chunks(args.reference, num_chunks=args.chunks)
 
+    ############### START PIPELINE ###############
+
+    new_sample_number = 0
+
+    for sample in fastq:
+        # Extract sample name
+        sample = extract_sample_list(sample)
+        args.sample = sample
+        if sample in sample_list_F:
+            # Variant sample dir
+            sample_variant_dir = os.path.join(out_variant_dir, sample)
+
+            sample_number = str(sample_list_F.index(sample) + 1)
+            sample_total = str(len(sample_list_F))
+
+            if sample in new_samples:
+                new_sample_number = str(int(new_sample_number) + 1)
+                new_sample_total = str(len(new_samples))
+                logger.info("\n" + WHITE_BG + "STARTING SAMPLE: " + sample + " (" + sample_number + "/" +
+                            sample_total + ")" + " (" + new_sample_number + "/" + new_sample_total + ")" + END_FORMATTING)
+            else:
+                logger.info("\n" + WHITE_BG + "STARTING SAMPLE: " + sample +
+                            " (" + sample_number + "/" + sample_total + ")" + END_FORMATTING)
+
+            # output_final_vcf = os.path.join(
+            #     sample_variant_dir, 'snps.all.ivar.tsv')
+
+    ##### MAPPING #####
+
+    # Mapping with minimap2, sorting Bam and indexing it (also can be made with bwa index & bwa mem -x ont2d)
+
+            # if not os.path.isfile(output_final_vcf):
+            HQ_filename = os.path.join(
+                in_samples_filtered_dir, sample + '.fastq')
+            # print(HQ_filename)
+            filename_out = sample.split('.')[0].split('_')[1]
+            # print(filename_out)
+            filename_bam_out = os.path.join(
+                out_bam_dir, filename_out + '.sort.bam')
+            filename_bai_out = os.path.join(
+                out_bam_dir, filename_out + '.sort.bam.bai')
+            # print(filename_bam_out)
+
+            logger.info(
+                '\n' + GREEN + BOLD + "STARTING ANALYSIS FOR SAMPLE " + filename_out + END_FORMATTING)
+
+            prior = datetime.datetime.now()
+
+            if os.path.isfile(filename_bai_out):
+                logger.info(YELLOW + filename_bam_out + ' EXIST\nOmmiting mapping for ' +
+                            filename_out + END_FORMATTING)
+            else:
+                logger.info(GREEN + 'Mapping sample ' +
+                            filename_out + END_FORMATTING)
+                minimap2_mapping(
+                    HQ_filename, filename_bam_out, reference=args.reference)
+
+            after = datetime.datetime.now()
+            print(("Done with function in: %s" % (after - prior) + '\n'))
+
+    ##### VARIANT CALLING #####
+
+    # Variant calling with freebayes-parallel (also can be made with nanopolish, we should use nanopolish index & nanopolish variants)
+
+            if filename_bam_out.endswith('bam'):
+                # print(filename_bam_out)
+                sample_variant_dir = os.path.join(
+                    out_variant_dir, filename_out)
+                # print(sample_variant_dir)
+                check_create_dir(sample_variant_dir)
+                output_raw_vcf = os.path.join(
+                    sample_variant_dir, 'snps.raw.vcf')
+                # print(output_raw_vcf)
+
+                prior = datetime.datetime.now()
+
+                if os.path.isfile(output_raw_vcf):
+                    logger.info(
+                        YELLOW + output_raw_vcf + ' EXIST\nOmmiting Variant Calling for sample ' + filename_out + END_FORMATTING)
+                else:
+                    logger.info(
+                        GREEN + 'Starting Variant Calling for sample ' + filename_out + END_FORMATTING)
+                    freebayes_variant(args.reference, filename_bam_out, output_raw_vcf, num_chunks=args.chunks, threads=args.threads,
+                                      frequency=args.min_frequency, base_qual=args.min_quality, map_qual=args.min_mapping)
+
+                after = datetime.datetime.now()
+                print(("Done with function in: %s" %
+                      (after - prior) + '\n'))
+
+    # Filtering the raw variant calling by quality, depth and frequency with bcftools. Also extracting complex variations and MNP with snippy-vcf_extract_subs
+
+                output_vcf = os.path.join(
+                    sample_variant_dir, 'snps.vcf')
+                # print(output_vcf)
+                output_vcf_filt = os.path.join(
+                    sample_variant_dir, "snps.filt.vcf")
+                # print(output_vcf_filt)
+                output_vcf_sub = os.path.join(
+                    sample_variant_dir, "snps.subs.vcf")
+                # print(output_vcf_sub)
+
+                prior = datetime.datetime.now()
+
+                if os.path.isfile(output_vcf_sub):
+                    logger.info(
+                        YELLOW + output_vcf_sub + ' EXIST\nOmmiting Variant Calling filter in ' + filename_out + END_FORMATTING)
+                else:
+                    logger.info(
+                        GREEN + 'Variant Calling filtering in sample ' + filename_out + END_FORMATTING)
+                    bcftool_filter(output_raw_vcf, output_vcf)
+                    snippy_sub(output_vcf, output_vcf_sub)
+
+                after = datetime.datetime.now()
+                print(("Done with function in: %s" %
+                      (after - prior) + '\n'))
+
+    # Variant format combination, extracting INDELs and combining with subs.vcf (SNPs, MNPs and complex)
+
+                out_variant_indel_sample = os.path.join(
+                    sample_variant_dir, "snps.indel.vcf")
+                # print(out_variant_indel_sample)
+                out_variant_all_sample = os.path.join(
+                    sample_variant_dir, "snps.all.vcf")
+                # print(out_variant_all_sample)
+
+                prior = datetime.datetime.now()
+
+                if os.path.isfile(out_variant_indel_sample):
+                    logger.info(YELLOW + out_variant_indel_sample +
+                                ' EXIST\nOmitting INDEL filtering in ' + filename_out + END_FORMATTING)
+                else:
+                    logger.info(GREEN + 'Filtering INDELs in ' +
+                                filename_out + END_FORMATTING)
+                    extract_indels(output_vcf)
+
+                if os.path.isfile(out_variant_all_sample):
+                    logger.info(YELLOW + out_variant_all_sample +
+                                'EXIST\nOmitting VCF combination for sample ' + filename_out + END_FORMATTING)
+                else:
+                    logger.info(GREEN + 'Combining VCF in ' +
+                                filename_out + END_FORMATTING)
+                    merge_vcf(output_vcf_sub, out_variant_indel_sample)
+
+                after = datetime.datetime.now()
+                print(("Done with function in: %s" % (after - prior) + '\n'))
+
+    # Variant format adaptation
+
+                out_variant_tsv_file = os.path.join(
+                    sample_variant_dir, 'snps.all.ivar.tsv')
+                # print(out_variant_tsv_file)
+
+                prior = datetime.datetime.now()
+
+                if os.path.isfile(out_variant_tsv_file):
+                    logger.info(YELLOW + out_variant_tsv_file +
+                                ' EXIST\nOmmiting format adaptation for ' + filename_out + END_FORMATTING)
+                else:
+                    logger.info(
+                        GREEN + 'Adapting variants format in sample ' + filename_out + END_FORMATTING)
+                    vcf_to_ivar_tsv(out_variant_all_sample,
+                                    out_variant_tsv_file)
+
+                after = datetime.datetime.now()
+                print(("Done with function in: %s" % (after - prior) + '\n'))
+
     logger.info('\n' + MAGENTA + BOLD +
                 '##### END OF ONT VARIANT CALLING PIPELINE #####' + '\n' + END_FORMATTING)
-
-
-# freebayes-parallel /home/laura/DATABASES/REFERENCES/ancestorII/reference.144679.regions 36 -f /home/laura/DATABASES/REFERENCES/ancestorII/MTB_ancestorII_reference.fa --haplotype-length 0 --use-best-n-alleles 1 --min-alternate-count 0 --min-alternate-fraction 0 -p 1 --min-coverage 1 -F 0.1 -q 7 -m 5 --strict-vcf BC09.sort.bam > BC09-BIS.freebayes

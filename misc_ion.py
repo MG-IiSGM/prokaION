@@ -56,65 +56,7 @@ YELLOW = '\033[93m'
 DIM = '\033[2m'
 
 
-def check_create_dir(path):
-    # exists = os.path.isfile(path)
-    # exists = os.path.isdir(path)
-
-    if os.path.exists(path):
-        pass
-    else:
-        os.mkdir(path)
-
-
-def check_file_exists(file_name):
-    """
-    Check file exist and is not 0Kb, if not program exit.
-    """
-
-    # Retrieve the file into to check if has size > 0
-    file_info = os.stat(file_name)
-
-    if not os.path.isfile(file_name) or file_info.st_size == 0:
-        logger.info(RED + BOLD + 'File: %s not found or empty\n' %
-                    file_name + END_FORMATTING)
-        sys.exit(1)
-    return os.path.isfile(file_name)
-
-
-def check_remove_file(file_name):
-    """
-    Check file exist and remove it.
-    """
-    if os.path.exists(file_name):
-        os.remove(file_name)
-
-
-def extract_read_list(input_dir):
-
-    input_dir = os.path.abspath(input_dir)
-    all_files = []
-
-    for root, _, files in os.walk(input_dir):
-        if root == input_dir:  # This only apply to parent folder, not subdirectories
-            for name in files:
-                filename = os.path.join(root, name)
-                is_files = re.match(r".*\.f(ast)*[aq5](\.gz)*", name)
-                if is_files:
-                    all_files.append(filename)
-
-    all_files = sorted(all_files)
-
-    return all_files
-
-
-def extract_sample_list(file):
-
-    basename_file = os.path.basename(file)
-
-    basename_file = basename_file.split('.')[0]
-
-    return basename_file
-
+### Executing functions ###
 
 def execute_subprocess(cmd, isShell=False, isInfo=False):
     """
@@ -155,8 +97,72 @@ def execute_subprocess(cmd, isShell=False, isInfo=False):
                  str(e)) + END_FORMATTING)
 
 
+### Manipulation of files and paths ###
+
+def check_create_dir(path):
+    # exists = os.path.isfile(path)
+    # exists = os.path.isdir(path)
+
+    if os.path.exists(path):
+        pass
+    else:
+        os.mkdir(path)
+
+
+def check_file_exists(file_name):
+    """
+    Check file exist and is not 0Kb, if not program exit.
+    """
+
+    # Retrieve the file into to check if has size > 0
+    file_info = os.stat(file_name)
+
+    if not os.path.isfile(file_name) or file_info.st_size == 0:
+        logger.info(RED + BOLD + 'File: %s not found or empty\n' %
+                    file_name + END_FORMATTING)
+        sys.exit(1)
+    return os.path.isfile(file_name)
+
+
+def check_remove_file(file_name):
+    """
+    Check file exist and remove it.
+    """
+
+    if os.path.exists(file_name):
+        os.remove(file_name)
+
+
+def extract_read_list(input_dir):
+
+    input_dir = os.path.abspath(input_dir)
+    all_files = []
+
+    for root, _, files in os.walk(input_dir):
+        if root == input_dir:  # This only apply to parent folder, not subdirectories
+            for name in files:
+                filename = os.path.join(root, name)
+                is_files = re.match(r".*\.f(ast)*[aq5](\.gz)*", name)
+                if is_files:
+                    all_files.append(filename)
+
+    all_files = sorted(all_files)
+
+    return all_files
+
+
+def extract_sample_list(file):
+
+    basename_file = os.path.basename(file)
+    basename_file = basename_file.split('.')[0]
+
+    return basename_file
+
+
 def check_reanalysis(output_dir, samples_to_analyze):
+
     output_dir = os.path.abspath(output_dir)
+
     new_samples = []
 
     variant_dir = os.path.join(output_dir, "Variants")
@@ -185,13 +191,18 @@ def check_reanalysis(output_dir, samples_to_analyze):
 
 
 def file_to_list(file_name):
+
     list_F = []
+
     file_name_abs = os.path.abspath(file_name)
     with open(file_name_abs, 'r') as f:
         for line in f:
             list_F.append(line.strip())
+
     return list_F
 
+
+### Processing Reference files ###
 
 def samtools_faidx(reference):
     # samtools faidx reference.fa
@@ -224,3 +235,100 @@ def create_reference_chunks(reference, num_chunks=144679):
         execute_subprocess(cmd_chunks, isShell=True)
 
     return out_reference_file
+
+
+### BAM Variant ###
+
+def extract_indels(input_vcf):
+
+    input_vcf = os.path.abspath(input_vcf)
+    vcf_dir = ('/').join(input_vcf.split('/')[0:-1])
+    output_indel_vcf = os.path.join(vcf_dir, 'snps.indel.vcf')
+
+    with open(output_indel_vcf, 'w+') as fout:
+        with open(input_vcf, 'r') as f:
+            for line in f:
+                if "TYPE=ins" in line or "TYPE=del" in line:
+                    fout.write(line)
+
+
+def merge_vcf(snp_vcf, indel_vcf):
+
+    snp_vcf = os.path.abspath(snp_vcf)
+    indel_vcf = os.path.abspath(indel_vcf)
+
+    vcf_dir = ('/').join(snp_vcf.split('/')[0:-1])
+    output_complete_vcf = os.path.join(vcf_dir, 'snps.all.vcf')
+
+    with open(output_complete_vcf, 'w+') as fout:
+        with open(snp_vcf, 'r') as f1:
+            for line in f1:
+                fout.write(line)
+        with open(indel_vcf, 'r') as f2:
+            for line in f2:
+                if not line.startswith("#"):
+                    fout.write(line)
+
+
+### VCF processing ###
+
+def import_VCF42_freebayes_to_tsv(vcf_file, sep='\t'):
+    vcf_file = os.path.abspath(vcf_file)
+    tsv_file = (".").join(vcf_file.split(".")[:-1]) + ".tsv"
+
+    headers = []
+    extra_fields = ['TYPE', 'DP', 'RO', 'AO']
+    with open(tsv_file, 'w+') as fout:
+        with open(vcf_file, 'r') as f:
+            next_line = f.readline().strip()
+            while next_line.startswith("#"):
+                next_line = f.readline().strip()
+                if next_line.startswith('#CHROM'):
+                    headers = next_line.split('\t')
+
+        headers = headers[:7] + extra_fields + ['OLDVAR']
+        fout.write(("\t").join(headers) + "\n")
+
+        with open(vcf_file, 'r') as f:
+            for line in f:
+                extra_field_list = []
+                # and not 'complex' in line and not 'mnp' in line
+                if not line.startswith("#"):
+                    line_split = line.split(sep)[:8]
+                    info = line_split[-1].split(";")
+                    for field in extra_fields:
+                        extra_field_list.append(
+                            [x.split("=")[-1] for x in info if field in x][0])
+                    if 'OLDVAR' in line:
+                        extra_field_list.append([x.split("=")[-1]
+                                                 for x in info if 'OLDVAR' in x][0].split(',')[0])
+                    output_line = ("\t").join(
+                        line_split[:7] + extra_field_list)
+                    fout.write(output_line + "\n")
+
+
+def import_tsv_freebayes_to_df(tsv_file, sep='\t'):
+
+    tsv_file = os.path.abspath(tsv_file)
+
+    df = pd.read_csv(tsv_file, sep=sep)
+
+    df.rename(columns={'#CHROM': 'REGION', 'RO': 'REF_DP',
+                       'DP': 'TOTAL_DP', 'AO': 'ALT_DP', 'QUAL': 'ALT_QUAL'}, inplace=True)
+
+    df['REF_FREQ'] = df['REF_DP']/df['TOTAL_DP']
+    df['ALT_FREQ'] = df['ALT_DP']/df['TOTAL_DP']
+
+    df = df.sort_values(by=['POS']).reset_index(drop=True)
+
+    return df[['REGION', 'POS', 'ID', 'REF', 'ALT', 'ALT_QUAL', 'FILTER', 'TOTAL_DP', 'TYPE', 'REF_DP', 'ALT_DP', 'REF_FREQ', 'ALT_FREQ', 'OLDVAR']]
+
+
+def vcf_to_ivar_tsv(input_vcf, output_tsv):
+
+    input_tsv = (".").join(input_vcf.split(".")[:-1]) + ".tsv"
+
+    import_VCF42_freebayes_to_tsv(input_vcf)
+
+    df = import_tsv_freebayes_to_df(input_tsv)
+    df.to_csv(output_tsv, sep="\t", index=False)
