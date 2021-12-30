@@ -183,23 +183,25 @@ def ONT_filtering(out_samples_dir, out_samples_filtered_dir):
     for root, _, files in os.walk(out_samples_dir):
         for name in files:
             filename = os.path.join(root, name)
-            for root2, _, files2 in os.walk(out_samples_filtered_dir):
-                for name2 in files2:
-                    filename_out = os.path.join(root2, name2)
-                    # print(filename_out)
+            # print(filename)
+            HQ_filename = os.path.basename(
+                filename.split('.')[0] + '.fastq.gz')
+            # print(HQ_filename)
+            filename_out = os.path.join(out_samples_filtered_dir, HQ_filename)
+            # print(filename_out)
 
-                if os.path.isfile(filename_out):
-                    logger.info(YELLOW + BOLD + name2 +
-                                ' EXIST\nOmmiting filtering for sample ' + name + '\n' + END_FORMATTING)
-                else:
-                    logger.info(
-                        GREEN + 'Filter sample ' + name + END_FORMATTING)
-                    cmd_filtering = 'gunzip -c {} | NanoFilt -q {} | gzip > {}'.format(
-                        filename, str(7), filename_out)
-                    # print(cmd_filtering)
-                    execute_subprocess(cmd_filtering, isShell=True)
+            if os.path.isfile(filename_out):
+                logger.info(YELLOW + BOLD + HQ_filename +
+                            ' EXIST\nOmmiting filtering for sample ' + name + '\n' + END_FORMATTING)
+            else:
+                logger.info(
+                    GREEN + 'Filter sample ' + name + END_FORMATTING)
+                cmd_filtering = 'gunzip -c {} | NanoFilt -q {} | gzip > {}'.format(
+                    filename, str(7), filename_out)
+                # print(cmd_filtering)
+                execute_subprocess(cmd_filtering, isShell=True)
 
-                    # fastp -i HQ_21453454-min.fastq.gz -o 21453454.FP.fastq.gz --cut_tail --cut_window_size 10 --cut_mean_quality 10 --length_required 35 --thread 30
+                # fastp -i HQ_21453454-min.fastq.gz -o 21453454.FP.fastq.gz --cut_tail --cut_window_size 10 --cut_mean_quality 10 --length_required 35 --thread 30
 
 
 def ONT_quality(out_samples_filtered_dir, out_qc_dir, threads=30):
@@ -209,30 +211,28 @@ def ONT_quality(out_samples_filtered_dir, out_qc_dir, threads=30):
 
     for root, _, files in os.walk(out_samples_filtered_dir):
         for name in files:
-            if 'HQ' in name:
-                # print(name)
-                HQ_filename = os.path.join(root, name)
-                # print(HQ_filename)
-                HQ_outqc = os.path.join(
-                    out_qc_dir, os.path.basename(HQ_filename.split('.')[0]))
-                check_create_dir(HQ_outqc)
-                # print(HQ_outqc)
-                HQ_outreport = [x for x in os.listdir(
-                    HQ_outqc) if 'NanoPlot-report' in x]
-                HQ_outreport_file = os.path.join(
-                    HQ_outqc, ''.join(HQ_outreport))
-                # print(HQ_outreport)
+            HQ_filename = os.path.join(root, name)
+            # print(HQ_filename)
+            HQ_outqc = os.path.join(
+                out_qc_dir, os.path.basename(HQ_filename.split('.')[0]))
+            check_create_dir(HQ_outqc)
+            # print(HQ_outqc)
+            HQ_outreport = [x for x in os.listdir(
+                HQ_outqc) if 'NanoPlot-report' in x]
+            HQ_outreport_file = os.path.join(
+                HQ_outqc, ''.join(HQ_outreport))
+            # print(HQ_outreport)
 
-                if os.path.isfile(HQ_outreport_file):
-                    logger.info(YELLOW + BOLD + HQ_outreport_file +
-                                ' EXIST\nOmmiting QC for sample ' + name + '\n' + END_FORMATTING)
-                else:
-                    logger.info(
-                        GREEN + 'Checking quality in sample ' + name + END_FORMATTING)
-                    cmd_QC = ['NanoPlot', '--fastq_rich', HQ_filename,
-                              '--N50', '-o', HQ_outqc, '-t', str(threads)]
-                    # print(cmd_QC)
-                    execute_subprocess(cmd_QC, isShell=False)
+            if os.path.isfile(HQ_outreport_file):
+                logger.info(YELLOW + BOLD + HQ_outreport_file +
+                            ' EXIST\nOmmiting QC for sample ' + name + '\n' + END_FORMATTING)
+            else:
+                logger.info(
+                    GREEN + 'Checking quality in sample ' + name + END_FORMATTING)
+                cmd_QC = ['NanoPlot', '--fastq_rich', HQ_filename,
+                          '--N50', '-o', HQ_outqc, '-t', str(threads)]
+                # print(cmd_QC)
+                execute_subprocess(cmd_QC, isShell=False)
 
 
 if __name__ == '__main__':
@@ -312,6 +312,8 @@ if __name__ == '__main__':
 
     # Basecalling
 
+    prior = datetime.datetime.now()
+
     logger.info('\n' + GREEN + "STARTING BASECALLING" + END_FORMATTING)
 
     if os.path.isfile(basecalling_summary):
@@ -323,7 +325,13 @@ if __name__ == '__main__':
         basecalling_ion(input_dir, out_basecalling_dir, config=args.config, callers=args.num_callers,
                         chunks=2048, threads=args.threads, records=args.records_per_fastq)
 
+    after = datetime.datetime.now()
+    print(('Done with function basecalling_ion in: %s' %
+           (after - prior) + '\n'))
+
     # Barcoding
+
+    prior = datetime.datetime.now()
 
     logger.info('\n' + GREEN + "STARTING BARCODING" + END_FORMATTING)
 
@@ -336,7 +344,13 @@ if __name__ == '__main__':
         barcoding_ion(out_basecalling_dir, out_barcoding_dir, barcode_kit=args.barcode_kit,
                       threads=args.threads, require_barcodes_both_ends=args.require_barcodes_both_ends)
 
+    after = datetime.datetime.now()
+    print(('Done with function barcoding_ion in: %s' %
+           (after - prior) + '\n'))
+
     # Read Filtering
+
+    prior = datetime.datetime.now()
 
     logger.info('\n' + GREEN + "STARTING SAMPLE FILTERING" + END_FORMATTING)
 
@@ -349,15 +363,31 @@ if __name__ == '__main__':
 
     ONT_filtering(out_samples_dir, out_samples_filtered_dir)
 
+    after = datetime.datetime.now()
+    print(('Done with function rename_files & ONT_filtering in: %s' %
+           (after - prior) + '\n'))
+
     # Quality Check
+
+    prior = datetime.datetime.now()
 
     logger.info('\n' + GREEN + "QUALITY CHECK IN RAW" + '\n' + END_FORMATTING)
 
     ONT_quality(out_samples_filtered_dir, out_qc_dir, threads=args.threads)
 
+    after = datetime.datetime.now()
+    print(('Done with function ONT_quality in: %s' %
+           (after - prior) + '\n'))
+
     # MinION data correction
 
+    # prior = datetime.datetime.now()
+
     # logger.info('\n' + GREEN + "MinION data correction" + END_FORMATTING)
+
+    # after = datetime.datetime.now()
+    # print(('Done with function XXX in: %s' %
+    #           (after - prior) + '\n'))
 
     logger.info('\n' + MAGENTA + BOLD +
                 "##### END OF ONT DATA PROCESSING PIPELINE #####" + '\n' + END_FORMATTING)

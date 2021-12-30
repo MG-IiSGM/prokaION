@@ -13,7 +13,7 @@ import multiprocessing
 
 # Local application imports
 
-from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list, samtools_faidx, create_reference_chunks, extract_indels, merge_vcf, vcf_to_ivar_tsv, create_bamstat, create_coverage, obtain_group_cov_stats, obtain_overal_stats
+from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list, samtools_faidx, create_reference_chunks, extract_indels, merge_vcf, vcf_to_ivar_tsv, create_bamstat, create_coverage, obtain_group_cov_stats, obtain_overal_stats, ivar_consensus, replace_consensus_header
 
 
 logger = logging.getLogger()
@@ -75,7 +75,7 @@ def get_arguments():
     variant_group.add_argument('-B', '--bayes', required=False, action='store_true',
                                help='Variant Calling is done with freebayes-parallel')
 
-    variant_group.add_argument('-f', '--min_allele_frequency', type=int, dest='min_frequency', required=False,
+    variant_group.add_argument('-f', '--min_allele_frequency', type=int, dest='min_allele_frequency', required=False,
                                default=0.1, help='Minimum fraction of observations supporting an alternate allele. Default: 0.1')
 
     variant_group.add_argument('-q', '--min_base_quality', type=int, dest='min_quality', required=False,
@@ -83,6 +83,12 @@ def get_arguments():
 
     variant_group.add_argument('-m', '--min_mapping_quality', type=int, dest='min_mapping', required=False,
                                default=60, help='Exclude alignments from analysis below threshold. Default: 60')
+
+    variant_group.add_argument('-F', '--min_frequency', type=int, dest='min_frequency', required=False,
+                               default=0.7, help='Minimum fraction of observations to call a base. Default: 0.7')
+
+    variant_group.add_argument('-d', '--min_depth', type=int, dest='min_depth', required=False,
+                               default=8, help='Minimum depth to call a base. Default: 8')
 
     reference_group = parser.add_argument_group(
         'Reference', 'Reference parameters')
@@ -98,6 +104,15 @@ def get_arguments():
 
     output_group.add_argument('-o', '--output', type=str, required=True,
                               help='REQUIRED. Output directory to extract all results')
+
+    quality_group = parser.add_argument_group(
+        'Quality parameters', 'Parameters for diferent Quality conditions')
+
+    quality_group.add_argument('-c', '--coverage20', type=int, default=50, required=False,
+                               help='Minimum percentage of coverage at 20X to clasify as uncovered. Default: 50%')
+
+    quality_group.add_argument('-n', '--min_snp', type=int, required=False,
+                               default=30, help='SNP number to pass quality threshold. Default: 30 HQ SNP')
 
     arguments = parser.parse_args()
 
@@ -193,27 +208,6 @@ def freebayes_variant(reference, filename_bam_out, output_vcf, threads=36, frequ
     region_file = create_reference_chunks(
         reference)
 
-    # for root, _, files in os.walk(out_bam_dir):
-    #     for name in files:
-    #         sample_file = os.path.join(root, name)
-    #         # print(sample_file)
-    #         if sample_file.endswith('bam'):
-    #             # print(sample_file)
-    #             sample_filename = sample_file.split('.')[0].split('/')[-1]
-    #             # print(sample_filename)
-    #             sample_variant_dir = os.path.join(
-    #                 out_variant_dir, sample_filename)
-    #             # print(sample_variant_dir)
-    #             check_create_dir(sample_variant_dir)
-    #             output_vcf = os.path.join(sample_variant_dir, "snps.vcf")
-    #             # print(output_vcf)
-
-    #             if os.path.isfile(output_vcf):
-    #                 logger.info(YELLOW + BOLD + output_vcf +
-    #                             ' EXIST\nOmmiting Variant Calling for sample ' + sample_filename + END_FORMATTING)
-    #             else:
-    #                 logger.info(
-    #                     GREEN + 'Starting Variant Calling for sample ' + sample_filename + END_FORMATTING)
     cmd_bayes = 'freebayes-parallel {} {} -f {} --haplotype-length 0 --use-best-n-alleles 1 --min-alternate-count 0 --min-alternate-fraction {} -p 1 --min-coverage 1 -q {} -m {} --strict-vcf {} > {}'.format(
         region_file, str(threads), reference, str(frequency), str(base_qual), str(map_qual), filename_bam_out, output_vcf)
     print(cmd_bayes)
@@ -310,6 +304,7 @@ if __name__ == '__main__':
 
     for sample in fastq:
         sample = extract_sample_list(sample)
+        # sample = sample.split('_')[1]
         sample_list.append(sample)
 
     # logger.info('\n' + CYAN + '{} Samples will be analysed: {}'.format(
@@ -329,10 +324,10 @@ if __name__ == '__main__':
 
     new_samples = check_reanalysis(args.output, sample_list_F)
 
-    logger.info(CYAN + "\n%d samples will be analysed: %s" %
-                (len(sample_list_F), ",".join(sample_list_F)) + END_FORMATTING)
-    logger.info(CYAN + "\n%d NEW samples will be analysed: %s" %
-                (len(new_samples), ",".join(new_samples)) + END_FORMATTING)
+    logger.info(CYAN + '\n%d samples will be analysed: %s' %
+                (len(sample_list_F), ','.join(sample_list_F)) + END_FORMATTING)
+    logger.info(CYAN + '\n%d NEW samples will be analysed: %s' %
+                (len(new_samples), ','.join(new_samples)) + END_FORMATTING)
 
     # Declare folders created in pipeline and key files
 
@@ -342,27 +337,30 @@ if __name__ == '__main__':
     out_variant_dir = os.path.join(output_dir, 'Variants')
     check_create_dir(out_variant_dir)
 
-    out_stats_dir = os.path.join(output_dir, "Stats")
+    out_consensus_dir = os.path.join(output_dir, 'Consensus')
+    check_create_dir(out_consensus_dir)
+
+    out_stats_dir = os.path.join(output_dir, 'Stats')
     check_create_dir(out_stats_dir)
     out_stats_bamstats_dir = os.path.join(
-        out_stats_dir, "Bamstats")  # subfolder
+        out_stats_dir, 'Bamstats')  # subfolder
     check_create_dir(out_stats_bamstats_dir)
     out_stats_coverage_dir = os.path.join(
-        out_stats_dir, "Coverage")  # subfolder
+        out_stats_dir, 'Coverage')  # subfolder
     check_create_dir(out_stats_coverage_dir)
 
-    out_compare_dir = os.path.join(output_dir, "Compare")
+    out_compare_dir = os.path.join(output_dir, 'Compare')
     check_create_dir(out_compare_dir)
 
-    out_annot_dir = os.path.join(output_dir, "Annotation")
+    out_annot_dir = os.path.join(output_dir, 'Annotation')
     check_create_dir(out_annot_dir)
-    out_annot_snpeff_dir = os.path.join(out_annot_dir, "snpeff")  # subfolder
+    out_annot_snpeff_dir = os.path.join(out_annot_dir, 'snpeff')  # subfolder
     check_create_dir(out_annot_snpeff_dir)
-    out_annot_user_dir = os.path.join(out_annot_dir, "user")  # subfolder
+    out_annot_user_dir = os.path.join(out_annot_dir, 'user')  # subfolder
     check_create_dir(out_annot_user_dir)
-    out_annot_user_aa_dir = os.path.join(out_annot_dir, "user_aa")  # subfolder
+    out_annot_user_aa_dir = os.path.join(out_annot_dir, 'user_aa')  # subfolder
     check_create_dir(out_annot_user_aa_dir)
-    out_annot_blast_dir = os.path.join(out_annot_dir, "blast")  # subfolder
+    out_annot_blast_dir = os.path.join(out_annot_dir, 'blast')  # subfolder
     check_create_dir(out_annot_blast_dir)
 
     samtools_faidx(args.reference)
@@ -387,11 +385,11 @@ if __name__ == '__main__':
             if sample in new_samples:
                 new_sample_number = str(int(new_sample_number) + 1)
                 new_sample_total = str(len(new_samples))
-                logger.info("\n" + WHITE_BG + "STARTING SAMPLE: " + sample + " (" + sample_number + "/" +
-                            sample_total + ")" + " (" + new_sample_number + "/" + new_sample_total + ")" + END_FORMATTING)
+                logger.info('\n' + WHITE_BG + 'STARTING SAMPLE: ' + sample + ' (' + sample_number + '/' +
+                            sample_total + ')' + ' (' + new_sample_number + '/' + new_sample_total + ')' + END_FORMATTING)
             else:
-                logger.info("\n" + WHITE_BG + "STARTING SAMPLE: " + sample +
-                            " (" + sample_number + "/" + sample_total + ")" + END_FORMATTING)
+                logger.info('\n' + WHITE_BG + 'STARTING SAMPLE: ' + sample +
+                            ' (' + sample_number + '/' + sample_total + ')' + END_FORMATTING)
 
             # output_final_vcf = os.path.join(
             #     sample_variant_dir, 'snps.all.ivar.tsv')
@@ -402,9 +400,10 @@ if __name__ == '__main__':
 
             # if not os.path.isfile(output_final_vcf):
             HQ_filename = os.path.join(
-                in_samples_filtered_dir, sample + '.fastq')
+                in_samples_filtered_dir, sample + '.fastq.gz')
             # print(HQ_filename)
-            filename_out = sample.split('.')[0].split('_')[1]
+            # filename_out = sample.split('.')[0].split('_')[1]
+            filename_out = sample
             # print(filename_out)
             filename_bam_out = os.path.join(
                 out_bam_dir, filename_out + '.sort.bam')
@@ -413,7 +412,7 @@ if __name__ == '__main__':
             # print(filename_bam_out)
 
             logger.info(
-                '\n' + GREEN + BOLD + "STARTING ANALYSIS FOR SAMPLE " + filename_out + END_FORMATTING)
+                '\n' + GREEN + BOLD + 'STARTING ANALYSIS FOR SAMPLE ' + filename_out + END_FORMATTING)
 
             prior = datetime.datetime.now()
 
@@ -427,7 +426,7 @@ if __name__ == '__main__':
                     HQ_filename, filename_bam_out, reference=args.reference)
 
             after = datetime.datetime.now()
-            print(("Done with function minimap2_mapping in: %s" %
+            print(('Done with function minimap2_mapping in: %s' %
                   (after - prior) + '\n'))
 
     ##### VARIANT CALLING #####
@@ -453,10 +452,10 @@ if __name__ == '__main__':
                     logger.info(
                         GREEN + 'Starting Variant Calling for sample ' + filename_out + END_FORMATTING)
                     freebayes_variant(args.reference, filename_bam_out, output_raw_vcf, threads=args.threads,
-                                      frequency=args.min_frequency, base_qual=args.min_quality, map_qual=args.min_mapping)
+                                      frequency=args.min_allele_frequency, base_qual=args.min_quality, map_qual=args.min_mapping)
 
                 after = datetime.datetime.now()
-                print(("Done with function freebayes_variant in: %s" %
+                print(('Done with function freebayes_variant in: %s' %
                       (after - prior) + '\n'))
 
     # Filtering the raw variant calling by quality, depth and frequency with bcftools. Also extracting complex variations and MNP with snippy-vcf_extract_subs
@@ -465,10 +464,10 @@ if __name__ == '__main__':
                     sample_variant_dir, 'snps.vcf')
                 # print(output_vcf)
                 output_vcf_filt = os.path.join(
-                    sample_variant_dir, "snps.filt.vcf")
+                    sample_variant_dir, 'snps.filt.vcf')
                 # print(output_vcf_filt)
                 output_vcf_sub = os.path.join(
-                    sample_variant_dir, "snps.subs.vcf")
+                    sample_variant_dir, 'snps.subs.vcf')
                 # print(output_vcf_sub)
 
                 prior = datetime.datetime.now()
@@ -483,17 +482,20 @@ if __name__ == '__main__':
                     snippy_sub(output_vcf, output_vcf_sub)
 
                 after = datetime.datetime.now()
-                print(("Done with function bcftools_filter & snippy_sub in: %s" %
+                print(('Done with function bcftools_filter & snippy_sub in: %s' %
                       (after - prior) + '\n'))
 
     # Variant format combination, extracting INDELs and combining with subs.vcf (SNPs, MNPs and complex)
 
                 out_variant_indel_sample = os.path.join(
-                    sample_variant_dir, "snps.indel.vcf")
+                    sample_variant_dir, 'snps.indel.vcf')
                 # print(out_variant_indel_sample)
                 out_variant_all_sample = os.path.join(
-                    sample_variant_dir, "snps.all.vcf")
+                    sample_variant_dir, 'snps.all.vcf')
                 # print(out_variant_all_sample)
+                chrom_filename = os.path.join(
+                    sample_variant_dir, 'snps.all.chromosome.vcf')
+                # print(chrom_filename)
 
                 prior = datetime.datetime.now()
 
@@ -514,7 +516,7 @@ if __name__ == '__main__':
                     merge_vcf(output_vcf_sub, out_variant_indel_sample)
 
                 after = datetime.datetime.now()
-                print(("Done with function extract_indels & merge_vcf in: %s" %
+                print(('Done with function extract_indels & merge_vcf in: %s' %
                       (after - prior) + '\n'))
 
     # Variant format adaptation
@@ -535,14 +537,38 @@ if __name__ == '__main__':
                                     out_variant_tsv_file)
 
                 after = datetime.datetime.now()
-                print(("Done with function vcf_to_ivar_tsv in: %s" %
+                print(('Done with function vcf_to_ivar_tsv in: %s' %
+                      (after - prior) + '\n'))
+
+    ##### CONSENSUS #####
+
+    # Building consensus fasta file with samtools mpileup and ivar consensus
+
+                out_consensus_file = os.path.join(
+                    out_consensus_dir, filename_out + '.fa')
+                # print(out_consensus_file)
+
+                prior = datetime.datetime.now()
+
+                if os.path.isfile(out_consensus_file):
+                    logger.info(YELLOW + out_consensus_file +
+                                ' EXIST\nOmmiting Consensus for ' + filename_out + END_FORMATTING)
+                else:
+                    logger.info(
+                        GREEN + 'Creating Consensus in sample ' + filename_out + END_FORMATTING)
+                    ivar_consensus(filename_bam_out, out_consensus_dir, filename_out, min_quality=args.min_quality,
+                                   min_frequency_threshold=args.min_frequency, min_depth=8, uncovered_character='N')
+                    replace_consensus_header(out_consensus_file)
+
+                after = datetime.datetime.now()
+                print(('Done with function ivar_consensus & replace_consensus_header in: %s' %
                       (after - prior) + '\n'))
 
     ##### CREATE STATS AND QUALITY FILTERS #####
 
     # Create Bamstats
 
-        out_bamstats_name = filename_out + ".bamstats"
+        out_bamstats_name = filename_out + '.bamstats'
         out_bamstats_file = os.path.join(
             out_stats_bamstats_dir, out_bamstats_name)
         # print(out_bamstats_file)
@@ -560,12 +586,12 @@ if __name__ == '__main__':
                 filename_bam_out, out_bamstats_file, threads=args.threads)
 
         after = datetime.datetime.now()
-        print(("Done with function create_bamstat in: %s" %
+        print(('Done with function create_bamstat in: %s' %
               (after - prior) + '\n'))
 
     # Create Coverage
 
-        out_coverage_name = filename_out + ".cov"
+        out_coverage_name = filename_out + '.cov'
         out_coverage_file = os.path.join(
             out_stats_coverage_dir, out_coverage_name)
         # print(out_coverage_file)
@@ -581,7 +607,7 @@ if __name__ == '__main__':
             create_coverage(filename_bam_out, out_coverage_file)
 
         after = datetime.datetime.now()
-        print(("Done with function create_coverage in: %s" %
+        print(('Done with function create_coverage in: %s' %
               (after - prior) + '\n'))
 
     # Coverage Output summary
@@ -596,11 +622,13 @@ if __name__ == '__main__':
 
     logger.info(GREEN + BOLD + 'Creating overal summary report in group ' +
                 group_name + END_FORMATTING)
-    obtain_overal_stats(out_stats_dir, group_name)
+    obtain_overal_stats(out_stats_dir, output_dir, group_name)
 
     after = datetime.datetime.now()
-    print(("Done with function obtain_group_cov_stats in: %s" %
+    print(('Done with function obtain_group_cov_stats & obtain_overal_stats in: %s' %
           (after - prior) + '\n'))
+
+    # Remove Uncovered
 
     logger.info('\n' + MAGENTA + BOLD +
                 '##### END OF ONT VARIANT CALLING PIPELINE #####' + '\n' + END_FORMATTING)
