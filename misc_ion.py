@@ -211,10 +211,26 @@ def remove_low_quality(in_samples_filtered_dir, output_dir, min_coverage=30, min
     right_now_full = '_'.join(right_now.split(' '))
 
     output_dir = os.path.abspath(output_dir)
+    out_bam_dir = os.path.join(output_dir, 'Bam')
+    out_consensus_dir = os.path.join(output_dir, 'Consensus')
+    out_stats_dir = os.path.join(output_dir, 'Stats')
+    out_stats_bamstats_dir = os.path.join(out_stats_dir, 'Bamstats')
+    out_stats_coverage_dir = os.path.join(out_stats_dir, 'Coverage')
+
+    folder_list = [out_bam_dir, out_consensus_dir, out_stats_dir,
+                   out_stats_bamstats_dir, out_stats_coverage_dir]
+
     uncovered_dir = os.path.join(output_dir, type_remove)  # Uncovered or Mixed
     uncovered_dir_variants = os.path.join(uncovered_dir, 'Variants')
+    uncovered_bam_dir = os.path.join(uncovered_dir, 'Bam')
+    uncovered_consensus_dir = os.path.join(uncovered_dir, 'Consensus')
+    uncovered_stats_dir = os.path.join(uncovered_dir, 'Stats')
+    uncovered_stats_bam_dir = os.path.join(uncovered_stats_dir, 'Bamstats')
+    uncovered_stats_cov_dir = os.path.join(uncovered_stats_dir, 'Coverage')
 
-    check_create_dir(uncovered_dir)
+    uncovered_folder_list = [uncovered_dir, uncovered_bam_dir, uncovered_consensus_dir,
+                             uncovered_stats_dir, uncovered_stats_bam_dir, uncovered_stats_cov_dir]
+    [check_create_dir(x) for x in uncovered_folder_list]
 
     uncovered_samples = []
 
@@ -224,6 +240,7 @@ def remove_low_quality(in_samples_filtered_dir, output_dir, min_coverage=30, min
         if root.endswith('Stats'):
             for name in files:
                 filename = os.path.join(root, name)
+                # Retreive coverage stats
                 if name.endswith('overal.stats.tab'):
                     coverage_stat_file = filename
                     stats_df = pd.read_csv(coverage_stat_file, sep='\t')
@@ -235,29 +252,38 @@ def remove_low_quality(in_samples_filtered_dir, output_dir, min_coverage=30, min
                         '.', '', 1).isdigit() else max(x.strip('()').split(','))
                     stats_df['HQ_SNP'] = stats_df.apply(
                         lambda x: f(x.HQ_SNP), axis=1)
-
                     stats_df['HQ_SNP'] = stats_df['HQ_SNP'].astype(float)
+
+                    # Store samples under any of the parameters indicated
                     uncovered_samples = stats_df['#SAMPLE'][(stats_df['UNMMAPED_PROP'] >= min_coverage) |
                                                             (stats_df['HQ_SNP'] < min_hq_snp)].tolist()
-                    # create a df with only covered to replace the original
+                    # print(uncovered_samples)
+
+                    # Create a df with only covered to replace the original
                     covered_df = stats_df[~stats_df['#SAMPLE'].isin(
                         uncovered_samples)]
+                    # print(covered_df)
                     covered_df.to_csv(coverage_stat_file,
                                       sep='\t', index=False)
-                    # create a df with uncovered
+
+                    # Create a df with uncovered
                     uncovered_df = stats_df[stats_df['#SAMPLE'].isin(
                         uncovered_samples)]
                     uncovered_table_filename = right_now_full + '_uncovered.summary.tab'
                     uncovered_table_file = os.path.join(
-                        uncovered_dir, uncovered_table_filename)
+                        uncovered_stats_dir, uncovered_table_filename)
+
                     if len(uncovered_samples) > 0:
                         uncovered_df.to_csv(
                             uncovered_table_file, sep='\t', index=False)
+
                 elif name.endswith('.coverage.summary.tab'):
                     covstats_df = pd.read_csv(filename, sep='\t')
                     final_covstat = filename
 
     uncovered_samples = [str(x) for x in uncovered_samples]
+    # print(uncovered_samples)
+
     def_covstats_df = covstats_df[~covstats_df['#SAMPLE'].isin(
         uncovered_samples)]
     def_covstats_df.to_csv(final_covstat, sep='\t', index=False)
@@ -265,49 +291,45 @@ def remove_low_quality(in_samples_filtered_dir, output_dir, min_coverage=30, min
     logger.debug('Uncovered_samples: ')
     logger.debug(uncovered_samples)
 
-    # Remove other files
-    for root, _, files in os.walk(output_dir):
-        for name in files:
-            if name.endswith('.cov') or name.endswith('.bamstats'):
-                filename = os.path.join(root, name)
-                #sample = re.search(r'^(.+?)[.]', name).group(1)
-                sample = name.split('.')[0]
-                if sample in uncovered_samples:
-                    logger.debug(
-                        'Removing FAULTY file {}'.format(filename))
-                    os.remove(filename)
-
     fastq = extract_read_list(in_samples_filtered_dir)
+    # print(fastq)
 
     sample_list_F = []
 
     for sample in fastq:
         sample = extract_sample_list(sample)
-        sample_name = sample.split('_')[1]
-        sample_list_F.append(sample_name)
+        # sample_name = sample.split('_')[1]
+        sample_list_F.append(sample)
 
-    # MOVE Fastq
+    # print(sample_list_F)
+
+    # # MOVE Fastq
     if len(uncovered_samples) > 0:
         for uncovered_sample in uncovered_samples:
             try:
                 uncovered_index = sample_list_F.index(uncovered_sample)
-                destination_file_r1 = os.path.join(
+                # print(uncovered_index)
+                destination_fastq = os.path.join(
                     uncovered_dir, fastq[uncovered_index].split('/')[-1])
-                logger.debug('Moving FAULTY fastas {} AND {} TO {} AND {}'.format(
-                    fastq[uncovered_index], destination_file_r1))
-                shutil.move(fastq[uncovered_index], destination_file_r1)
+                # print(destination_fastq)
+                logger.debug('Moving FAULTY Fastq {} TO {}'.format(
+                    fastq[uncovered_index], destination_fastq))
+                # print(fastq[uncovered_index])
+                shutil.move(fastq[uncovered_index], destination_fastq)
             except:
                 logger.info('ERROR: No uncovered detected')
 
     # Move Variant Folder
-
     for root, _, files in os.walk(output_dir):
         if root.endswith('Variants') and not 'Uncovered' in root:
+            # print(root)
             if len(uncovered_samples) > 0:
                 for uncovered in uncovered_samples:
                     filename = os.path.join(root, uncovered)
+                    # print(filename)
                     destination_file = os.path.join(
                         uncovered_dir_variants, uncovered)
+                    # print(destination_file)
                     if not os.path.exists(destination_file):
                         logger.debug('Moving FAULTY folder {} TO {}'.format(
                             filename, destination_file))
@@ -315,6 +337,22 @@ def remove_low_quality(in_samples_filtered_dir, output_dir, min_coverage=30, min
                     else:
                         logger.debug(
                             '{} already exist'.format(destination_file))
+
+    # Move Bam, Consensus and Stats files to Uncovered folder
+
+    for outdir, uncovdir in zip(folder_list, uncovered_folder_list[1:]):
+        for root, _, files in os.walk(outdir):
+            # print(root)
+            if root == outdir:
+                for name in files:
+                    filename = os.path.join(outdir, name)
+                    # print(filename)
+                    sample = re.search(r'^(.+?)[._-]', name).group(1)
+                    # print(sample)
+                    if sample in uncovered_samples:
+                        destination_file = os.path.join(uncovdir, name)
+                        # print(destination_file)
+                        shutil.move(filename, destination_file)
 
     return uncovered_samples
 

@@ -181,27 +181,31 @@ def ONT_filtering(out_samples_dir, out_samples_filtered_dir):
     # -q: Filter on a minimum average read quality score
 
     for root, _, files in os.walk(out_samples_dir):
-        for name in files:
-            filename = os.path.join(root, name)
-            # print(filename)
-            HQ_filename = os.path.basename(
-                filename.split('.')[0] + '.fastq.gz')
-            # print(HQ_filename)
-            filename_out = os.path.join(out_samples_filtered_dir, HQ_filename)
-            # print(filename_out)
+        if not root.endswith('Filtered_Fastq'):
+            # print(root)
+            for name in files:
+                # print(name)
+                filename = os.path.join(root, name)
+                # print(filename)
+                HQ_filename = os.path.basename(
+                    filename.split('.')[0] + '.fastq.gz')
+                # print(HQ_filename)
+                filename_out = os.path.join(
+                    out_samples_filtered_dir, HQ_filename)
+                # print(filename_out)
 
-            if os.path.isfile(filename_out):
-                logger.info(YELLOW + BOLD + HQ_filename +
-                            ' EXIST\nOmmiting filtering for sample ' + name + '\n' + END_FORMATTING)
-            else:
-                logger.info(
-                    GREEN + 'Filter sample ' + name + END_FORMATTING)
-                cmd_filtering = 'gunzip -c {} | NanoFilt -q {} | gzip > {}'.format(
-                    filename, str(7), filename_out)
-                # print(cmd_filtering)
-                execute_subprocess(cmd_filtering, isShell=True)
+                if os.path.isfile(filename_out):
+                    logger.info(YELLOW + BOLD + HQ_filename +
+                                ' EXIST\nOmmiting filtering for sample ' + name + '\n' + END_FORMATTING)
+                else:
+                    logger.info(
+                        GREEN + 'Filter sample ' + name + END_FORMATTING)
+                    cmd_filtering = 'gunzip -c {} | NanoFilt -q {} | gzip > {}'.format(
+                        filename, str(7), filename_out)
+                    # print(cmd_filtering)
+                    execute_subprocess(cmd_filtering, isShell=True)
 
-                # fastp -i HQ_21453454-min.fastq.gz -o 21453454.FP.fastq.gz --cut_tail --cut_window_size 10 --cut_mean_quality 10 --length_required 35 --thread 30
+                    # fastp -i HQ_21453454-min.fastq.gz -o 21453454.FP.fastq.gz --cut_tail --cut_window_size 10 --cut_mean_quality 10 --length_required 35 --thread 30
 
 
 def ONT_quality(out_samples_filtered_dir, out_qc_dir, threads=30):

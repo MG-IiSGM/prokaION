@@ -13,7 +13,7 @@ import multiprocessing
 
 # Local application imports
 
-from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list, samtools_faidx, create_reference_chunks, extract_indels, merge_vcf, vcf_to_ivar_tsv, create_bamstat, create_coverage, obtain_group_cov_stats, obtain_overal_stats, ivar_consensus, replace_consensus_header
+from misc_ion import check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list, samtools_faidx, create_reference_chunks, extract_indels, merge_vcf, vcf_to_ivar_tsv, create_bamstat, create_coverage, obtain_group_cov_stats, obtain_overal_stats, ivar_consensus, replace_consensus_header, remove_low_quality
 
 
 logger = logging.getLogger()
@@ -629,6 +629,24 @@ if __name__ == '__main__':
           (after - prior) + '\n'))
 
     # Remove Uncovered
+
+    prior = datetime.datetime.now()
+
+    logger.info(GREEN + 'Removing low quality samples in group ' +
+                group_name + END_FORMATTING)
+
+    uncovered_samples = remove_low_quality(
+        in_samples_filtered_dir, output_dir, min_coverage=args.coverage20, min_hq_snp=args.min_snp, type_remove='Uncovered')
+
+    if len(uncovered_samples) > 1:
+        logger.info(GREEN + 'Uncovered samples: ' +
+                    (',').join(uncovered_samples) + END_FORMATTING)
+    else:
+        logger.info(GREEN + 'NO uncovered samples found' + END_FORMATTING)
+
+    after = datetime.datetime.now()
+    print(('Done with function remove_low_quality in: %s' %
+          (after - prior) + '\n'))
 
     logger.info('\n' + MAGENTA + BOLD +
                 '##### END OF ONT VARIANT CALLING PIPELINE #####' + '\n' + END_FORMATTING)
