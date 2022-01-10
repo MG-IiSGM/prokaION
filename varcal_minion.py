@@ -38,8 +38,6 @@ from misc_ion import (
     user_annotation,
     user_annotation_aa,
     make_blast,
-    annotation_to_html,
-    report_samples_html,
 )
 
 
