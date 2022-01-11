@@ -75,7 +75,7 @@ DIM = "\033[2m"
 def get_arguments():
 
     parser = argparse.ArgumentParser(
-        prog="autosnp_minion.py",
+        prog="varcal_minion.py",
         description="Pipeline to Variant Calling from MinION sequencing",
     )
 
@@ -550,6 +550,7 @@ if __name__ == "__main__":
     # Logging
     # Create log file with date and time
 
+    today = str(datetime.date.today())
     right_now = str(datetime.datetime.now())
     right_now_full = "_".join(right_now.split(" "))
     log_filename = group_name + "_" + right_now_full + ".log"
@@ -1269,6 +1270,21 @@ if __name__ == "__main__":
     ##### COMPARISON #####
 
     # SNPs comparison using tsv variant files
+
+    logger.info(
+        "\n\n"
+        + BLUE
+        + BOLD
+        + "STARTING COMPARISON IN GROUP: "
+        + group_name
+        + END_FORMATTING
+        + "\n"
+    )
+
+    folder_compare = today + "_" + group_name
+    path_compare = os.path.join(out_compare_dir, folder_compare)
+    check_create_dir(path_compare)
+    full_path_compare = os.path.join(path_compare, group_name)
 
     logger.info(
         "\n"
