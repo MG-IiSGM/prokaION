@@ -37,7 +37,16 @@ from misc_ion import (
     annotate_snpeff,
     user_annotation,
     user_annotation_aa,
-    make_blast,
+    make_blast
+)
+
+from compare_snp_prokaion import (
+    ddbb_create_intermediate,
+    recalibrate_ddbb_vcf_intermediate,
+    remove_position_range,
+    extract_complex_list,
+    revised_df,
+    ddtb_compare
 )
 
 
@@ -188,7 +197,8 @@ def get_arguments():
         help="Minimum depth to call a base. Default: 8",
     )
 
-    reference_group = parser.add_argument_group("Reference", "Reference parameters")
+    reference_group = parser.add_argument_group(
+        "Reference", "Reference parameters")
 
     reference_group.add_argument(
         "-r",
@@ -324,48 +334,48 @@ def get_arguments():
         "--min_threshold_discard_uncov_sample",
         required=False,
         type=float,
-        default=0.5,
-        help="Minimum uncovered genome to discard a sample. Default: 0.5",
+        default=0.6,
+        help="Minimum uncovered genome to discard a sample. Default: 0.6",
     )
 
     compare_group.add_argument(
         "--min_threshold_discard_uncov_pos",
         required=False,
         type=float,
-        default=0.5,
-        help="Minimum covered position to discard it. Default: 0.5",
+        default=0.6,
+        help="Minimum covered position to discard it. Default: 0.6",
     )
 
     compare_group.add_argument(
         "--min_threshold_discard_htz_sample",
         required=False,
         type=float,
-        default=0.5,
-        help="Minimum heterozygosity to discard a sample. Default: 0.5",
+        default=0.6,
+        help="Minimum heterozygosity to discard a sample. Default: 0.6",
     )
 
     compare_group.add_argument(
         "--min_threshold_discard_htz_pos",
         required=False,
         type=float,
-        default=0.5,
-        help="Minimum heterozygosity to discard a position",
+        default=0.6,
+        help="Minimum heterozygosity to discard a position. Default: 0.6",
     )
 
     compare_group.add_argument(
         "--min_threshold_discard_all_sample",
         required=False,
         type=float,
-        default=0.5,
-        help="Minimum inaccuracies to discard a sample. Default: 0.5",
+        default=0.6,
+        help="Minimum inaccuracies to discard a sample. Default: 0.6",
     )
 
     compare_group.add_argument(
         "--min_threshold_discard_all_pos",
         required=False,
         type=float,
-        default=0.5,
-        help="Minimum inaccuracies to discard a position",
+        default=0.6,
+        help="Minimum inaccuracies to discard a position. Default: 0.6",
     )
 
     output_group = parser.add_argument_group(
@@ -541,7 +551,8 @@ if __name__ == "__main__":
     args = get_arguments()
 
     input_dir = os.path.abspath(args.input_dir)
-    in_samples_filtered_dir = os.path.join(input_dir, "Samples_Fastq/Filtered_Fastq")
+    in_samples_filtered_dir = os.path.join(
+        input_dir, "Samples_Fastq/Filtered_Fastq")
     output_dir = os.path.abspath(args.output)
     group_name = output_dir.split("/")[-1]
     check_create_dir(output_dir)
@@ -639,9 +650,11 @@ if __name__ == "__main__":
 
     out_stats_dir = os.path.join(output_dir, "Stats")
     check_create_dir(out_stats_dir)
-    out_stats_bamstats_dir = os.path.join(out_stats_dir, "Bamstats")  # subfolder
+    out_stats_bamstats_dir = os.path.join(
+        out_stats_dir, "Bamstats")  # subfolder
     check_create_dir(out_stats_bamstats_dir)
-    out_stats_coverage_dir = os.path.join(out_stats_dir, "Coverage")  # subfolder
+    out_stats_coverage_dir = os.path.join(
+        out_stats_dir, "Coverage")  # subfolder
     check_create_dir(out_stats_coverage_dir)
 
     out_compare_dir = os.path.join(output_dir, "Compare")
@@ -719,13 +732,16 @@ if __name__ == "__main__":
             # Mapping with minimap2, sorting Bam and indexing it (also can be made with bwa index & bwa mem -x ont2d)
 
             # if not os.path.isfile(output_final_vcf):
-            HQ_filename = os.path.join(in_samples_filtered_dir, sample + ".fastq.gz")
+            HQ_filename = os.path.join(
+                in_samples_filtered_dir, sample + ".fastq.gz")
             # print(HQ_filename)
             # filename_out = sample.split('.')[0].split('_')[1]
             filename_out = sample
             # print(filename_out)
-            filename_bam_out = os.path.join(out_bam_dir, filename_out + ".sort.bam")
-            filename_bai_out = os.path.join(out_bam_dir, filename_out + ".sort.bam.bai")
+            filename_bam_out = os.path.join(
+                out_bam_dir, filename_out + ".sort.bam")
+            filename_bai_out = os.path.join(
+                out_bam_dir, filename_out + ".sort.bam.bai")
             # print(filename_bam_out)
 
             logger.info(
@@ -748,14 +764,16 @@ if __name__ == "__main__":
                     + END_FORMATTING
                 )
             else:
-                logger.info(GREEN + "Mapping sample " + filename_out + END_FORMATTING)
+                logger.info(GREEN + "Mapping sample " +
+                            filename_out + END_FORMATTING)
                 minimap2_mapping(
                     HQ_filename, filename_bam_out, reference=args.reference
                 )
 
             after = datetime.datetime.now()
             print(
-                ("Done with function minimap2_mapping in: %s" % (after - prior) + "\n")
+                ("Done with function minimap2_mapping in: %s" %
+                 (after - prior) + "\n")
             )
 
             ##### VARIANT CALLING #####
@@ -764,10 +782,12 @@ if __name__ == "__main__":
 
             if filename_bam_out.endswith("bam"):
                 # print(filename_bam_out)
-                sample_variant_dir = os.path.join(out_variant_dir, filename_out)
+                sample_variant_dir = os.path.join(
+                    out_variant_dir, filename_out)
                 # print(sample_variant_dir)
                 check_create_dir(sample_variant_dir)
-                output_raw_vcf = os.path.join(sample_variant_dir, "snps.raw.vcf")
+                output_raw_vcf = os.path.join(
+                    sample_variant_dir, "snps.raw.vcf")
                 # print(output_raw_vcf)
 
                 prior = datetime.datetime.now()
@@ -800,7 +820,8 @@ if __name__ == "__main__":
                 after = datetime.datetime.now()
                 print(
                     (
-                        "Done with function freebayes_variant in: %s" % (after - prior)
+                        "Done with function freebayes_variant in: %s" % (
+                            after - prior)
                         + "\n"
                     )
                 )
@@ -809,9 +830,11 @@ if __name__ == "__main__":
 
                 output_vcf = os.path.join(sample_variant_dir, "snps.vcf")
                 # print(output_vcf)
-                output_vcf_filt = os.path.join(sample_variant_dir, "snps.filt.vcf")
+                output_vcf_filt = os.path.join(
+                    sample_variant_dir, "snps.filt.vcf")
                 # print(output_vcf_filt)
-                output_vcf_sub = os.path.join(sample_variant_dir, "snps.subs.vcf")
+                output_vcf_sub = os.path.join(
+                    sample_variant_dir, "snps.subs.vcf")
                 # print(output_vcf_sub)
 
                 prior = datetime.datetime.now()
@@ -921,12 +944,14 @@ if __name__ == "__main__":
                         + filename_out
                         + END_FORMATTING
                     )
-                    vcf_to_ivar_tsv(out_variant_all_sample, out_variant_tsv_file)
+                    vcf_to_ivar_tsv(out_variant_all_sample,
+                                    out_variant_tsv_file)
 
                 after = datetime.datetime.now()
                 print(
                     (
-                        "Done with function vcf_to_ivar_tsv in: %s" % (after - prior)
+                        "Done with function vcf_to_ivar_tsv in: %s" % (
+                            after - prior)
                         + "\n"
                     )
                 )
@@ -982,7 +1007,8 @@ if __name__ == "__main__":
         # Create Bamstats
 
         out_bamstats_name = filename_out + ".bamstats"
-        out_bamstats_file = os.path.join(out_stats_bamstats_dir, out_bamstats_name)
+        out_bamstats_file = os.path.join(
+            out_stats_bamstats_dir, out_bamstats_name)
         # print(out_bamstats_file)
         # print(filename_bam_out)
 
@@ -1000,15 +1026,18 @@ if __name__ == "__main__":
             logger.info(
                 GREEN + "Creating Bamstats in sample " + filename_out + END_FORMATTING
             )
-            create_bamstat(filename_bam_out, out_bamstats_file, threads=args.threads)
+            create_bamstat(filename_bam_out, out_bamstats_file,
+                           threads=args.threads)
 
         after = datetime.datetime.now()
-        print(("Done with function create_bamstat in: %s" % (after - prior) + "\n"))
+        print(("Done with function create_bamstat in: %s" %
+              (after - prior) + "\n"))
 
         # Create Coverage
 
         out_coverage_name = filename_out + ".cov"
-        out_coverage_file = os.path.join(out_stats_coverage_dir, out_coverage_name)
+        out_coverage_file = os.path.join(
+            out_stats_coverage_dir, out_coverage_name)
         # print(out_coverage_file)
 
         prior = datetime.datetime.now()
@@ -1028,7 +1057,8 @@ if __name__ == "__main__":
             create_coverage(filename_bam_out, out_coverage_file)
 
         after = datetime.datetime.now()
-        print(("Done with function create_coverage in: %s" % (after - prior) + "\n"))
+        print(("Done with function create_coverage in: %s" %
+              (after - prior) + "\n"))
 
     # Coverage Output summary
 
@@ -1117,7 +1147,8 @@ if __name__ == "__main__":
                     # print(sample)
                     filename = os.path.join(root, name)
                     # print(filename)
-                    chrom_filename = os.path.join(root, "snps.all.chromosome.vcf")
+                    chrom_filename = os.path.join(
+                        root, "snps.all.chromosome.vcf")
                     out_annot_file = os.path.join(
                         out_annot_snpeff_dir, sample + ".annot"
                     )
@@ -1149,7 +1180,7 @@ if __name__ == "__main__":
     else:
         logger.info(
             YELLOW
-            + DIM
+            + BOLD
             + "No SnpEFF database suplied, skipping annotation in group "
             + group_name
             + END_FORMATTING
@@ -1182,10 +1213,12 @@ if __name__ == "__main__":
                 if name == "snps.all.ivar.tsv":
                     sample = root.split("/")[-1]
                     # print(sample)
-                    logger.info("User bed/vcf annotation in sample {}".format(sample))
+                    logger.info(
+                        "User bed/vcf annotation in sample {}".format(sample))
                     filename = os.path.join(root, name)
                     # print(filename)
-                    out_annot_file = os.path.join(out_annot_user_dir, sample + ".tsv")
+                    out_annot_file = os.path.join(
+                        out_annot_user_dir, sample + ".tsv")
                     user_annotation(
                         filename,
                         out_annot_file,
@@ -1213,7 +1246,8 @@ if __name__ == "__main__":
                 for name in files:
                     if name.endswith(".annot"):
                         sample = name.split(".")[0]
-                        logger.info("User aa annotation in sample {}".format(sample))
+                        logger.info(
+                            "User aa annotation in sample {}".format(sample))
                         filename = os.path.join(root, name)
                         out_annot_aa_file = os.path.join(
                             out_annot_user_aa_dir, sample + ".tsv"
@@ -1250,7 +1284,8 @@ if __name__ == "__main__":
                 if name.endswith(".fa"):
                     filename = os.path.join(root, name)
                     sample = root.split("/")[-1]
-                    logger.info("User FASTA annotation in sample {}".format(sample))
+                    logger.info(
+                        "User FASTA annotation in sample {}".format(sample))
 
                     for db in args.annot_fasta:
                         make_blast(
@@ -1286,12 +1321,117 @@ if __name__ == "__main__":
     check_create_dir(path_compare)
     full_path_compare = os.path.join(path_compare, group_name)
 
+    compare_snp_matrix_recal = full_path_compare + ".revised.final.tsv"
+    compare_snp_matrix_recal_intermediate = (
+        full_path_compare + ".revised_intermediate.tsv"
+    )
+    compare_snp_matrix_recal_mpileup = (
+        full_path_compare + ".revised_intermediate_vcf.tsv"
+    )
+    compare_snp_matrix_INDEL_intermediate = (
+        full_path_compare + ".revised_INDEL_intermediate.tsv"
+    )
+
+    # Create intermediate
+
+    prior = datetime.datetime.now()
+
+    recalibrated_snp_matrix_intermediate = ddbb_create_intermediate(
+        out_variant_dir,
+        out_stats_coverage_dir,
+        min_freq_discard=0.1,
+        min_alt_dp=7,
+        only_snp=False,
+    )
+    recalibrated_snp_matrix_intermediate.to_csv(
+        compare_snp_matrix_recal_intermediate, sep="\t", index=False
+    )
+
+    after = datetime.datetime.now()
+    print(
+        ("Done with function ddbb_create_intermediate in: %s" %
+         (after - prior) + "\n")
+    )
+
+    # Recalibrate intermediate with VCF
+
+    prior = datetime.datetime.now()
+
+    recalibrated_snp_matrix_mpileup = recalibrate_ddbb_vcf_intermediate(
+        compare_snp_matrix_recal_intermediate, out_variant_dir, min_cov_low_freq=7)
+    recalibrated_snp_matrix_mpileup.to_csv(
+        compare_snp_matrix_recal_mpileup, sep='\t', index=False)
+
+    after = datetime.datetime.now()
+    print(
+        ("Done with function recalibrate_ddbb_vcf_intermediate in: %s" %
+         (after - prior) + "\n")
+    )
+
+    # Remove SNPs located within INDELs
+
+    prior = datetime.datetime.now()
+
+    compare_snp_matrix_INDEL_intermediate_df = remove_position_range(
+        recalibrated_snp_matrix_mpileup)
+    compare_snp_matrix_INDEL_intermediate_df.to_csv(
+        compare_snp_matrix_INDEL_intermediate, sep='\t', index=False)
+
+    after = datetime.datetime.now()
+    print(
+        ("Done with function remove_position_range in: %s" %
+         (after - prior) + "\n")
+    )
+
+    # Extract all positions marked as complex
+
+    prior = datetime.datetime.now()
+
+    complex_variants = extract_complex_list(out_variant_dir)
+    logger.debug('Complex positions in all samples:\n{}'.format(
+        (','.join([str(x) for x in complex_variants]))))
+
+    after = datetime.datetime.now()
+    print(
+        ("Done with function extract_complex_list in: %s" %
+         (after - prior) + "\n")
+    )
+
+    # Clean all faulty positions and samples for final table
+
+    prior = datetime.datetime.now()
+
+    recalibrated_revised_INDEL_df = revised_df(compare_snp_matrix_INDEL_intermediate_df, path_compare, complex_pos=complex_variants, min_freq_include=0.7, min_threshold_discard_uncov_sample=args.min_threshold_discard_uncov_sample, min_threshold_discard_uncov_pos=args.min_threshold_discard_uncov_pos, min_threshold_discard_htz_sample=args.min_threshold_discard_htz_sample,
+                                               min_threshold_discard_htz_pos=args.min_threshold_discard_htz_pos, min_threshold_discard_all_pos=args.min_threshold_discard_all_pos, min_threshold_discard_all_sample=args.min_threshold_discard_all_sample, remove_faulty=True, drop_samples=True, drop_positions=True, windows_size_discard=args.window)
+    recalibrated_revised_INDEL_df.to_csv(
+        compare_snp_matrix_recal, sep='\t', index=False)
+
+    after = datetime.datetime.now()
+    print(
+        ("Done with function revised_df in: %s" %
+         (after - prior) + "\n")
+    )
+
+    # Matrix to pairwise and nwk
+
+    prior = datetime.datetime.now()
+
+    ddtb_compare(compare_snp_matrix_recal, distance=5)
+
+    after = datetime.datetime.now()
+    print(
+        ("Done with function ddtb_compare in: %s" %
+         (after - prior) + "\n")
+    )
+
+    logger.info('\n\n' + MAGENTA + BOLD + 'COMPARISON FINISHED IN GROUP: ' +
+                group_name + END_FORMATTING + '\n')
+
     logger.info(
         "\n"
         + MAGENTA
         + BOLD
-        + "##### END OF ONT VARIANT CALLING PIPELINE #####"
+        + "##### END OF ONT VARIANT CALLING MINION PIPELINE #####"
         + "\n"
         + END_FORMATTING
     )
-
