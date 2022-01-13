@@ -1360,11 +1360,11 @@ if __name__ == "__main__":
     recalibrated_snp_matrix_mpileup = recalibrate_ddbb_vcf_intermediate(
         compare_snp_matrix_recal_intermediate, out_variant_dir, min_cov_low_freq=7)
     recalibrated_snp_matrix_mpileup.to_csv(
-        compare_snp_matrix_recal_mpileup, sep='\t', index=False)
+        compare_snp_matrix_recal_mpileup, sep="\t", index=False)
 
     after = datetime.datetime.now()
     print(
-        ("Done with function recalibrate_ddbb_vcf_intermediate in: %s" %
+        ('\n' + "Done with function recalibrate_ddbb_vcf_intermediate in: %s" %
          (after - prior) + "\n")
     )
 

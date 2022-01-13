@@ -50,6 +50,22 @@ def get_arguments():
     return arguments
 
 
+def check_file_exists(file_name):
+    """
+        Check file exist and is not 0 Kb, if not program exit.
+    """
+
+    # Retrieve the file info to check if has size > 0
+    file_info = os.stat(file_name)
+
+    if not os.path.isfile(file_name) or file_info.st_size == 0:
+        logger.info(RED + BOLD + "File: %s not found or empty\n" %
+                    file_name + END_FORMATTING)
+        sys.exit(1)
+
+    return os.path.isfile(file_name)
+
+
 def import_tsv_variants(
     tsv_file, sample, min_total_depth=4, min_alt_dp=7, only_snp=True
 ):
@@ -70,6 +86,18 @@ def import_tsv_variants(
     else:
         df = df.drop(["TYPE"], axis=1)
         return df
+
+
+def import_to_pandas(file_table, header=False, sep='\t'):
+
+    if header == False:
+        # Exclude first line, exclusive for vcf
+        dataframe = pd.read_csv(file_table, sep=sep, skiprows=[0], header=None)
+    else:
+        # Use first line as header
+        dataframe = pd.read_csv(file_table, sep=sep, header=0)
+
+    return dataframe
 
 
 def extract_lowfreq(tsv_file, sample, min_total_depth=4, min_alt_dp=4, min_freq_include=0.7, only_snp=True):
@@ -400,6 +428,17 @@ def recalibrate_ddbb_vcf_intermediate(snp_matrix_ddbb_file, variant_dir, min_cov
     final_df.columns = selected_columns + samples
     final_df = final_df.drop(['CHROM', 'REF', 'POS', 'ALT'], axis=1)
 
+    def extract_sample_count(row):
+        count_list = [i not in ['!', 0, '0'] for i in row[3:]]
+        selected_samples = [sample for (sample, true_false) in zip(
+            samples, count_list) if true_false]
+        return (sum(count_list), (',').join(selected_samples))
+
+    final_df[['N', 'Samples']] = final_df.apply(
+        extract_sample_count, axis=1, result_type='expand')
+
+    return final_df
+
 
 def remove_position_range(df):
 
@@ -462,6 +501,27 @@ def add_window_distance(vcf_df, window_size=10):
 
     list_pos = vcf_df.POS.to_list()  # All positions
     set_pos = set(list_pos)  # To set for later comparing
+    # Max to iter over positions (independent from reference)
+    max_pos = max(vcf_df.POS.to_list())
+    all_list = list(range(1, max_pos + 1))  # Create a list to slide one by one
+
+    df_header = 'window_' + str(window_size)
+    vcf_df[df_header] = 1  # Create all 1 by default
+
+    # Slide over windows
+    for i in range(0, max_pos, 1):
+        # This splits the list in windows of determined length
+        window_pos = all_list[i:i+window_size]
+        set_window_pos = set(window_pos)
+        # How many known positions are in every window for later clasification
+        num_conglomerate = set_pos & set_window_pos
+
+        if len(num_conglomerate) > 1:
+            for i in num_conglomerate:
+                # Retrieve index with the known position
+                index = vcf_df.index[vcf_df['POS'] == i][0]
+                if vcf_df.loc[index, df_header] < len(num_conglomerate):
+                    vcf_df.loc[index, df_header] = len(num_conglomerate)
 
 
 def revised_df(df, out_dir=False, complex_pos=False, min_freq_include=0.7, min_threshold_discard_uncov_sample=0.6, min_threshold_discard_uncov_pos=0.6, min_threshold_discard_htz_sample=0.6, min_threshold_discard_htz_pos=0.6, min_threshold_discard_all_pos=0.6, min_threshold_discard_all_sample=0.6, remove_faulty=True, drop_samples=True, drop_positions=True, windows_size_discard=2):
@@ -478,8 +538,449 @@ def revised_df(df, out_dir=False, complex_pos=False, min_freq_include=0.7, min_t
         faulty_positions = report_position['Position'][(report_position.uncov_fract >= min_threshold_discard_uncov_pos) | (
             report_position.htz_frac >= min_threshold_discard_htz_pos) | (report_position.faulty_frac >= min_threshold_discard_all_pos)].tolist()
 
+        uncovered_samples = df.iloc[:, 3:].apply(lambda x: sum(
+            [i in ['!'] for i in x.values])/sum([(i not in [0, '0']) for i in x.values]), axis=0)
+        heterozygous_samples = df.iloc[:, 3:].apply(lambda x: sum([(i not in ['!', '?', 0, 1, '0', '1']) and (float(
+            i) < min_freq_include) and (float(i) > 0.1) for i in x.values])/sum([(i not in [0, '0']) for i in x.values]), axis=0)
+        report_samples = pd.DataFrame({'sample': df.iloc[:, 3:].columns, 'uncov_fract': uncovered_samples,
+                                      'htz_frac': heterozygous_samples, 'faulty_frac': uncovered_samples + heterozygous_samples})
+        faulty_samples = report_samples['sample'][(report_samples.uncov_fract >= min_threshold_discard_uncov_sample) | (
+            report_samples.htz_frac >= min_threshold_discard_htz_sample) | (report_samples.faulty_frac >= min_threshold_discard_all_sample)].tolist()
+
         # Calculate close SNPs/INDELs and remove those with 2 or more mutations in 10bp
         df['POS'] = df.apply(lambda x: x.Position.split('|')[2], axis=1)
         df['POS'] = df['POS'].astype(int)
         df = df.sort_values('POS')
         add_window_distance(df)
+
+        if out_dir:
+            out_dir = os.path.abspath(out_dir)
+            report_samples_windows = os.path.join(
+                out_dir, 'report_windows.tsv')
+            report_samples_file = os.path.join(out_dir, 'report_samples.tsv')
+            report_faulty_samples_file = os.path.join(
+                out_dir, 'faulty_samples.tsv')
+            report_positions_file = os.path.join(
+                out_dir, 'report_positions.tsv')
+            report_faulty_positions_file = os.path.join(
+                out_dir, 'faulty_positions.tsv')
+            intermediate_cleaned_file = os.path.join(
+                out_dir, 'intermediate.highfreq.tsv')
+
+            report_position.to_csv(report_positions_file,
+                                   sep='\t', index=False)
+            report_samples.to_csv(report_samples_file, sep='\t', index=False)
+
+            with open(report_faulty_samples_file, 'w+') as f:
+                f.write(('\n').join(faulty_samples))
+            with open(report_faulty_positions_file, 'w+') as f2:
+                f2.write(('\n').join(faulty_positions))
+
+            df.to_csv(report_samples_windows, sep='\t')
+
+        clustered_positions = df['POS'][df.window_10 >
+                                        windows_size_discard].tolist()
+
+        if drop_positions == True:
+            df = df[~df.Position.isin(faulty_positions)]
+        if drop_samples == True:
+            df = df.drop(faulty_samples, axis=1)
+
+        logger.debug('FAULTY POSITIONS:\n{}\n\nFAULTY SAMPLES:\n{}'.format(
+            ("\n").join(faulty_positions), ("\n").join(faulty_samples)))
+
+    if len(clustered_positions) == 0:
+        clustered_positions = [0]
+    logger.debug('CLUSTERED POSITIONS' + '\n' +
+                 (',').join([str(x) for x in clustered_positions]))
+
+    if complex_pos:
+        logger.debug('COMPLEX POSITIONS' + "\n" +
+                     (',').join([str(x) for x in complex_pos]))
+        clustered_positions = list(set(clustered_positions + complex_pos))
+
+    logger.debug('ALL CLOSE POSITIONS' + "\n" +
+                 (',').join([str(x) for x in clustered_positions]))
+
+    # Remove close mutations and complex positions
+    df = df[~df.POS.isin(clustered_positions)]
+
+    # Remove complex variants in_freq_include
+    df['valid'] = df.apply(lambda x: sum(
+        [i != '?' and i != '!' and float(i) >= min_freq_include for i in x[3:]]), axis=1)
+    df = df[df.valid >= 1]
+    df = df.drop('valid', axis=1)
+    df = df.drop('window_10', axis=1)
+    df = df.drop('POS', axis=1)
+
+    if out_dir != False:
+        df.to_csv(intermediate_cleaned_file, sep='\t', index=False)
+
+    df = df.replace('!', 0)
+    df = df.replace('?', 1)
+    df.iloc[:, 3:] = df.iloc[:, 3:].astype(float)
+
+    # Replace Htz to 0
+    # f = lambda x: 1 if x >= min_freq_include else 0 # IF HANDLE HETEROZYGOUS CHANGE THIS 0 for X or 0.5
+    # df.iloc[:,3:] = df.iloc[:,3:].applymap(f)
+
+    # Replace Htz with 1
+    # IF HANDLE HETEROZYGOUS CHANGE THIS 0 for X or 0.5
+    def fn(x): return 1 if x > 0.5 else 0
+    df.iloc[:, 3:] = df.iloc[:, 3:].applymap(fn)
+    df.N = df.apply(lambda x: sum(x[3:]), axis=1)
+
+    def extract_sample_name(row):
+        count_list = [i not in ['!', 0, '0'] for i in row[3:]]
+        samples = np.array(df.columns[3:])
+        # samples[np.array(count_list)] # Filter array with True/False array
+        return ((',').join(samples[np.array(count_list)]))
+
+    df['Samples'] = df.apply(extract_sample_name, axis=1)
+
+    # Remove positions with 0 samples after htz
+    df = df[df.N > 0]
+
+    return df
+
+
+def dendogram_dataframe(dataframe, output_file):
+
+    dataframe_only_samples = dataframe.set_index(dataframe['Position']).drop(
+        ['Position', 'N', 'Samples'], axis=1)  # Extract three first colums and use 'Position' as index
+
+    labelList = dataframe_only_samples.columns.tolist()
+    Z = shc.linkage(dataframe_only_samples.T,
+                    method='average')  # method='single'
+
+    plt.rcParams['lines.linewidth'] = 8  # Dendrogram line with
+    plt.rcParams['xtick.major.size'] = 10  # Only affect to tick (line) size
+    plt.rcParams.update({'font.size': 30})  # Increase x tick label size
+    # plt.tick_params(labelsize=30)
+    plt.figure(figsize=(30, 50))
+    plt.ylabel('samples', fontsize=30)
+    plt.xlabel('snp distance', fontsize=30)
+
+    shc.dendrogram(Z, labels=labelList, orientation='left', distance_sort='descending',
+                   show_leaf_counts=True, color_threshold=10, leaf_font_size=20)
+
+    plt.savefig(output_file, format="png")
+
+
+def linkage_to_newick(dataframe, output_file):
+    """
+    Thanks to https://github.com/biocore/scikit-bio/issues/1579
+    Input :  Z = linkage matrix, labels = leaf labels
+    Output:  Newick formatted tree string
+    """
+
+    dataframe_only_samples = dataframe.set_index(dataframe['Position']).drop(
+        ['Position', 'N', 'Samples'], axis=1)  # Extract three first colums and use 'Position' as index
+
+    labelList = dataframe_only_samples.columns.tolist()
+    Z = shc.linkage(dataframe_only_samples.T, method='average')
+
+    tree = shc.to_tree(Z, False)
+
+    def buildNewick(node, newick, parentdist, leaf_names):
+        if node.is_leaf():
+            # logger.info("%s:%f%s" % (leaf_names[node.id], parentdist - node.dist, newick))
+            return "%s:%f%s" % (leaf_names[node.id], parentdist - node.dist, newick)
+        else:
+            if len(newick) > 0:
+                newick = f"):{(parentdist - node.dist)/2}{newick}"
+            else:
+                newick = ");"
+            newick = buildNewick(node.get_left(), newick,
+                                 node.dist, leaf_names)
+            newick = buildNewick(node.get_right(), ",%s" %
+                                 (newick), node.dist, leaf_names)
+            newick = "(%s" % (newick)
+            # logger.info(newick)
+            return newick
+
+    with open(output_file, 'w') as f:
+        f.write(buildNewick(tree, "", tree.dist, labelList))
+    return buildNewick(tree, "", tree.dist, labelList)
+
+
+def matrix_to_rdf(snp_matrix, output_name):
+
+    with open(output_name, 'w+') as fout:
+        snp_number = snp_matrix.shape[0]
+        first_line = "  ;1.0\n"
+        # logger.info(first_line)
+        fout.write(first_line)
+
+        snp_list = snp_matrix.Position.tolist()
+        snp_list = [x.split('|')[2] for x in snp_list]
+        snp_list = " ;".join([str(x) for x in snp_list]) + " ;\n"
+        # logger.info(snp_list)
+        fout.write(snp_list)
+
+        third_line = ("10;" * snp_number) + "\n"
+        # logger.info(third_line)
+        fout.write(third_line)
+
+        transposed_snp_matrix = snp_matrix.T
+
+        for index, row in transposed_snp_matrix.iloc[3:, :].iterrows():
+            sample_header = ">" + index+";1;;;;;;;\n"
+            # logger.info(sample_header)
+            fout.write(sample_header)
+            snp_row = "".join([str(x) for x in row.tolist()]) + "\n"
+            # logger.info(snp_row)
+            fout.write(snp_row)
+
+        ref_header = ">REF;1;;;;;;;\n"
+        # logger.info(ref_header)
+        fout.write(ref_header)
+        ref_snp = "0" * snp_number
+        # logger.info(ref_snp)
+        fout.write(ref_snp)
+
+
+def matrix_to_common(snp_matrix, output_name):
+
+    max_samples = max(snp_matrix.N.tolist())
+    total_samples = len(snp_matrix.columns[3:])
+
+    if max_samples == total_samples:
+        with open(output_name, 'w+') as fout:
+            common_snps = snp_matrix['Position'][snp_matrix.N == max_samples].astype(
+                str).tolist()
+            line = "\n".join(common_snps)
+            fout.write("Position\n")
+            fout.write(line)
+    else:
+        logger.info("No common SNPs were found")
+
+
+def pairwise_to_cluster(pw, threshold=0):
+
+    groups = {}
+    columns = pw.columns.tolist()
+    sorted_df = pw[(pw[columns[0]] != pw[columns[1]]) & (
+        pw[columns[2]] <= threshold)].sort_values(by=[columns[2]])
+
+    def rename_dict_clusters(cluster_dict):
+        reordered_dict = {}
+        for i, k in enumerate(list(cluster_dict)):
+            reordered_dict[i] = cluster_dict[k]
+        return reordered_dict
+
+    def regroup_clusters(list_keys, groups_dict, both_samples_list):
+        # Sum previous clusters
+        list_keys.sort()
+        new_cluster = sum([groups_dict[key] for key in list_keys], [])
+        # Add new cluster
+        cluster_asign = list(set(new_cluster + both_samples_list))
+        # Remove duped cluster
+        first_cluster = list_keys[0]
+        groups_dict[first_cluster] = cluster_asign
+        rest_cluster = list_keys[1:]
+        for key in rest_cluster:
+            del groups_dict[key]
+        groups_dict = rename_dict_clusters(groups_dict)
+        return groups_dict
+
+    for _, row in sorted_df.iterrows():
+        group_number = len(groups)
+        sample_1 = str(row[0])
+        sample_2 = str(row[1])
+        both_samples_list = row[0:2].tolist()
+
+        if group_number == 0:
+            groups[group_number] = both_samples_list
+
+        all_samples_dict = sum(groups.values(), [])
+
+        if sample_1 in all_samples_dict or sample_2 in all_samples_dict:
+            # Extract cluster which have the new samples
+            key_with_sample = {key for (key, value) in groups.items() if (
+                sample_1 in value or sample_2 in value)}
+
+            cluster_with_sample = list(key_with_sample)
+            cluster_with_sample_name = cluster_with_sample[0]
+            number_of_shared_clusters = len(key_with_sample)
+
+            if number_of_shared_clusters > 1:
+                groups = regroup_clusters(
+                    cluster_with_sample, groups, both_samples_list)
+            else:
+                groups[cluster_with_sample_name] = list(
+                    set(groups[cluster_with_sample_name] + both_samples_list))
+
+        else:
+            groups[group_number] = both_samples_list
+
+    for _, row in pw[(pw[pw.columns[0]] != pw[pw.columns[1]]) & (pw[pw.columns[2]] > threshold)].iterrows():
+        sample_1 = str(row[0])
+        sample_2 = str(row[1])
+        all_samples_dict = sum(groups.values(), [])
+
+        if sample_1 not in all_samples_dict:
+            group_number = len(groups)
+            groups[group_number] = [sample_1]
+
+        if sample_2 not in all_samples_dict:
+            group_number = len(groups)
+            groups[group_number] = [sample_2]
+
+    cluster_df = pd.DataFrame(groups.values(), index=list(groups))
+
+    cluster_df_return = cluster_df.stack().droplevel(
+        1).reset_index().rename(columns={'index': 'group', 0: 'id'})
+
+    return cluster_df_return
+
+
+def calculate_N(row):
+
+    return len(row.samples)
+
+
+def calculate_mean_distance(row, df):
+
+    if row.N > 1:
+        list_sample = row.samples
+        list_sample = [str(x) for x in list_sample]
+        list_sample = [x.split(".")[0] for x in list_sample]
+        dataframe = df.loc[list_sample, list_sample]
+        stacked_df = dataframe.stack()
+        mean_distance = stacked_df.mean(skipna=True)
+        min_distance = stacked_df.min(skipna=True)
+        max_distance = stacked_df.max(skipna=True)
+        return round(mean_distance, 2), min_distance, max_distance
+    else:
+        return 'NaN', 'NaN', 'NaN'
+
+
+def matrix_to_cluster(pairwise_file, matrix_file, distance=0):
+
+    output_dir = ('/').join(pairwise_file.split('/')[0:-1])
+
+    logger.info('Reading Matrix')
+    dfdist = pd.read_csv(matrix_file, index_col=0, sep='\t', )
+    dfdist.columns = dfdist.columns.astype(str)
+    dfdist.index = dfdist.index.astype(str)
+    logger.info('Reading Pairwise')
+    pairwise = pd.read_csv(pairwise_file, sep="\t", names=[
+                           'sample_1', 'sample_2', 'dist'])
+    logger.info('Creating Clusters')
+
+    clusters = pairwise_to_cluster(pairwise, threshold=distance)
+
+    cluster_summary = clusters.groupby('group')['id'].apply(
+        list).reset_index(name='samples')
+    cluster_summary['N'] = cluster_summary.apply(calculate_N, axis=1)
+    cluster_summary = cluster_summary.sort_values(by=['N'], ascending=False)
+
+    logger.info('Reseting group number by length')
+    sorted_index = cluster_summary.index.to_list()
+    sorted_index.sort()
+    sorted_index = [x + 1 for x in sorted_index]
+    cluster_summary['group'] = sorted_index
+    cluster_summary = cluster_summary.sort_values(by=['N'], ascending=False)
+
+    cluster_summary[['mean', 'min', 'max']] = cluster_summary.apply(
+        lambda x: calculate_mean_distance(x, dfdist), axis=1, result_type="expand")
+
+    final_cluster = cluster_summary[["group", "samples"]].explode(
+        "samples").reset_index(drop=True)
+    final_cluster = final_cluster.sort_values(by=['group'], ascending=True)
+
+    final_cluster_file = os.path.join(
+        output_dir, "group_table_" + str(distance) + ".tsv")
+    cluster_summary_file = os.path.join(
+        output_dir, "group_summary_" + str(distance) + ".tsv")
+
+    cluster_summary.to_csv(cluster_summary_file, sep='\t', index=False)
+    final_cluster.to_csv(final_cluster_file, sep='\t', index=False)
+
+
+def snp_distance_matrix(dataframe, output_matrix, output_pairwise):
+
+    dataframe_only_samples = dataframe.set_index(dataframe['Position']).drop(
+        ['Position', 'N', 'Samples'], axis=1)  # Extract three first colums and use 'Position' as index
+    hamming_distance = pairwise_distances(
+        dataframe_only_samples.T, metric="hamming")  # dataframe.T means transposed
+    snp_distance_df = pd.DataFrame(hamming_distance * len(dataframe_only_samples.index),
+                                   index=dataframe_only_samples.columns, columns=dataframe_only_samples.columns)  # Add index
+    snp_distance_df = snp_distance_df.astype(int)
+    pairwise = snp_distance_df.stack().reset_index(name='distance').rename(
+        columns={'level_0': 'sample_1', 'level_1': 'sample_2'})
+
+    snp_distance_df.to_csv(output_matrix, sep='\t', index=True)
+    pairwise.to_csv(output_pairwise, sep='\t', header=False, index=False)
+
+
+def hamming_distance_matrix(dataframe, output_file):
+
+    dataframe_only_samples = dataframe.set_index(dataframe['Position']).drop(
+        ['Position', 'N', 'Samples'], axis=1)  # Extract three first colums and use 'Position' as index
+    hamming_distance = pairwise_distances(
+        dataframe_only_samples.T, metric="hamming")  # dataframe.T means transposed
+    hamming_distance_df = pd.DataFrame(
+        hamming_distance, index=dataframe_only_samples.columns, columns=dataframe_only_samples.columns)  # Add index
+
+    hamming_distance_df.to_csv(output_file, sep='\t', index=True)
+
+
+def ddtb_compare(final_database, distance=0):
+
+    database_file = os.path.abspath(final_database)
+    check_file_exists(database_file)
+    presence_ddbb = import_to_pandas(database_file, header=True)
+
+    output_path = database_file.split('.')[0]
+
+    logger.info('Output path is: ' + output_path)
+    logger.info('\n' + BLUE + BOLD + 'Comparing all samples in ' +
+                database_file + END_FORMATTING)
+
+    # Calculate SNP distance for all and save file
+    logger.info(CYAN + "SNP distance" + END_FORMATTING)
+    snp_dist_file = output_path + ".snp.tsv"
+    pairwise_file = output_path + ".snp.pairwise.tsv"
+    snp_distance_matrix(presence_ddbb, snp_dist_file, pairwise_file)
+
+    # Calculate hamming distance for all and save file
+    logger.info(CYAN + "Hamming distance" + END_FORMATTING)
+    hmm_dist_file = output_path + ".hamming.tsv"
+    hamming_distance_matrix(presence_ddbb, hmm_dist_file)
+
+    """
+    # Represent pairwise snp distance for all and save file
+    logger.info(CYAN + "Drawing distance" + END_FORMATTING)
+    prior_represent = datetime.datetime.now()
+    png_dist_file = output_path + ".snp.distance.png"
+    # clustermap_dataframe(presence_ddbb, png_dist_file)
+    after_represent = datetime.datetime.now()
+    logger.info("Done with distance drawing in: %s" %
+                (after_represent - prior_represent))
+    """
+
+    # Represent dendrogram snp distance for all and save file
+    logger.info(CYAN + "Drawing dendrogram" + END_FORMATTING)
+    png_dend_file = output_path + ".snp.dendrogram.png"
+    dendogram_dataframe(presence_ddbb, png_dend_file)
+
+    # Output a Newick file distance for all and save file
+    logger.info(CYAN + "Newick dendrogram" + END_FORMATTING)
+    newick_file = output_path + ".nwk"
+    linkage_to_newick(presence_ddbb, newick_file)
+
+    # Output a binary snp matrix distance in rdf format
+    logger.info(CYAN + "rdf format" + END_FORMATTING)
+    rdf_file = output_path + ".rdf"
+    matrix_to_rdf(presence_ddbb, rdf_file)
+
+    # Output a list of all common snps in group compared
+    logger.info(CYAN + "Common SNPs" + END_FORMATTING)
+    common_file = output_path + ".common.txt"
+    matrix_to_common(presence_ddbb, common_file)
+
+    # Output files with group/cluster assigned to samples
+    logger.info(CYAN + "Assigning clusters" + END_FORMATTING)
+    matrix_to_cluster(pairwise_file, snp_dist_file, distance=distance)
