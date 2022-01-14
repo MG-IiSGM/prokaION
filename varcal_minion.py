@@ -1431,7 +1431,7 @@ if __name__ == "__main__":
         "\n"
         + MAGENTA
         + BOLD
-        + "##### END OF ONT VARIANT CALLING MINION PIPELINE #####"
+        + "##### END OF ONT VARIANT CALLING PIPELINE #####"
         + "\n"
         + END_FORMATTING
     )
