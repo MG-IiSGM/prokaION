@@ -470,6 +470,7 @@ def freebayes_variant(
     output_vcf,
     threads=36,
     frequency=0.1,
+    ploidy=1,
     base_qual=7,
     map_qual=5,
 ):
@@ -479,7 +480,7 @@ def freebayes_variant(
         freebayes-parallel <(fasta_generate_regions.py {fai_reference} {chunks}) {threads} {args} > {output}
     """
 
-    # region_file:
+    # region_file: Genome partitioning according to computational threads.
     # --haplotype_length: Allow haplotype calls with contiguous embedded matches of up to this length
     # --use-best-n-alleles: Evaluate only the best N SNP alleles, ranked by sum of supporting quality scores
     # --min-alternate-count: Require at least this count of observations supporting an alternate allele within a single individual in order to evaluate the position
@@ -492,11 +493,12 @@ def freebayes_variant(
 
     region_file = create_reference_chunks(reference)
 
-    cmd_bayes = "freebayes-parallel {} {} -f {} --haplotype-length 0 --use-best-n-alleles 1 --min-alternate-count 0 --min-alternate-fraction {} -p 1 --min-coverage 1 -q {} -m {} --strict-vcf {} > {}".format(
+    cmd_bayes = "freebayes-parallel {} {} -f {} --haplotype-length 0 --use-best-n-alleles 1 --min-alternate-count 0 --min-alternate-fraction {} -p {} --min-coverage 1 -q {} -m {} --strict-vcf {} > {}".format(
         region_file,
         str(threads),
         reference,
         str(frequency),
+        str(ploidy),
         str(base_qual),
         str(map_qual),
         filename_bam_out,
@@ -813,6 +815,7 @@ if __name__ == "__main__":
                         output_raw_vcf,
                         threads=args.threads,
                         frequency=args.min_allele_frequency,
+                        ploidy=args.ploidy,
                         base_qual=args.min_quality,
                         map_qual=args.min_mapping,
                     )
@@ -1340,7 +1343,7 @@ if __name__ == "__main__":
         out_variant_dir,
         out_stats_coverage_dir,
         min_freq_discard=0.1,
-        min_alt_dp=7,
+        min_alt_dp=10,
         only_snp=False,
     )
     recalibrated_snp_matrix_intermediate.to_csv(
@@ -1358,7 +1361,7 @@ if __name__ == "__main__":
     prior = datetime.datetime.now()
 
     recalibrated_snp_matrix_mpileup = recalibrate_ddbb_vcf_intermediate(
-        compare_snp_matrix_recal_intermediate, out_variant_dir, min_cov_low_freq=7)
+        compare_snp_matrix_recal_intermediate, out_variant_dir, min_cov_low_freq=10)
     recalibrated_snp_matrix_mpileup.to_csv(
         compare_snp_matrix_recal_mpileup, sep="\t", index=False)
 
@@ -1401,7 +1404,7 @@ if __name__ == "__main__":
 
     prior = datetime.datetime.now()
 
-    recalibrated_revised_INDEL_df = revised_df(compare_snp_matrix_INDEL_intermediate_df, path_compare, complex_pos=complex_variants, min_freq_include=0.7, min_threshold_discard_uncov_sample=args.min_threshold_discard_uncov_sample, min_threshold_discard_uncov_pos=args.min_threshold_discard_uncov_pos, min_threshold_discard_htz_sample=args.min_threshold_discard_htz_sample,
+    recalibrated_revised_INDEL_df = revised_df(compare_snp_matrix_INDEL_intermediate_df, path_compare, complex_pos=complex_variants, min_freq_include=0.8, min_threshold_discard_uncov_sample=args.min_threshold_discard_uncov_sample, min_threshold_discard_uncov_pos=args.min_threshold_discard_uncov_pos, min_threshold_discard_htz_sample=args.min_threshold_discard_htz_sample,
                                                min_threshold_discard_htz_pos=args.min_threshold_discard_htz_pos, min_threshold_discard_all_pos=args.min_threshold_discard_all_pos, min_threshold_discard_all_sample=args.min_threshold_discard_all_sample, remove_faulty=True, drop_samples=True, drop_positions=True, windows_size_discard=args.window)
     recalibrated_revised_INDEL_df.to_csv(
         compare_snp_matrix_recal, sep='\t', index=False)

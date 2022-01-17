@@ -9,6 +9,7 @@ import subprocess
 import datetime
 import gzip
 import multiprocessing
+from tkinter import END
 import pandas as pd
 import numpy as np
 from pandarallel import pandarallel
@@ -419,7 +420,7 @@ def ddbb_create_intermediate(
     return df
 
 
-def recheck_variant_rawvcf_intermediate(row, positions, alt_snps, variant_dir, min_cov_low_freq=7):
+def recheck_variant_rawvcf_intermediate(row, positions, alt_snps, variant_dir, min_cov_low_freq=10):
     """
     CU458896.1	3068036	.	G	A	262.784	.	AB=0.8;ABP=14.7363;AC=1;AF=0.5;AN=2;AO=12;CIGAR=1X;DP=15;DPB=15;DPRA=0;EPP=9.52472;EPPR=3.73412;GTI=0;LEN=1;MEANALT=1;MQM=60;MQMR=60;NS=1;NUMALT=1;ODDS=0.121453;PAIRED=0.333333;PAIREDR=0;PAO=0;PQA=0;PQR=0;PRO=0;QA=410;QR=108;RO=3;RPL=7;RPP=3.73412;RPPR=9.52472;RPR=5;RUN=1;SAF=4;SAP=5.9056;SAR=8;SRF=1;SRP=3.73412;SRR=2;TYPE=snp	GT:DP:AD:RO:QR:AO:QA:GL	0/1:15:3,12:3:108:12:410:-32.709,0,-5.55972
     """
@@ -532,7 +533,7 @@ def recheck_variant_rawvcf_intermediate(row, positions, alt_snps, variant_dir, m
     return row
 
 
-def recalibrate_ddbb_vcf_intermediate(snp_matrix_ddbb_file, variant_dir, min_cov_low_freq=7):
+def recalibrate_ddbb_vcf_intermediate(snp_matrix_ddbb_file, variant_dir, min_cov_low_freq=12):
     """
     https://github.com/nalepae/pandarallel
     """
@@ -666,7 +667,7 @@ def add_window_distance(vcf_df, window_size=10):
                     vcf_df.loc[index, df_header] = len(num_conglomerate)
 
 
-def revised_df(df, out_dir=False, complex_pos=False, min_freq_include=0.7, min_threshold_discard_uncov_sample=0.6, min_threshold_discard_uncov_pos=0.6, min_threshold_discard_htz_sample=0.6, min_threshold_discard_htz_pos=0.6, min_threshold_discard_all_pos=0.6, min_threshold_discard_all_sample=0.6, remove_faulty=True, drop_samples=True, drop_positions=True, windows_size_discard=2):
+def revised_df(df, out_dir=False, complex_pos=False, min_freq_include=0.8, min_threshold_discard_uncov_sample=0.6, min_threshold_discard_uncov_pos=0.6, min_threshold_discard_htz_sample=0.6, min_threshold_discard_htz_pos=0.6, min_threshold_discard_all_pos=0.6, min_threshold_discard_all_sample=0.6, remove_faulty=True, drop_samples=True, drop_positions=True, windows_size_discard=2):
 
     if remove_faulty == True:
 
@@ -1158,7 +1159,7 @@ if __name__ == '__main__':
 
     stream_handler = logging.StreamHandler()
     stream_handler.setLevel(logging.INFO)
-    stream_handler.setFormatter(formatter)
+    # stream_handler.setFormatter(formatter)
 
     logger.addHandler(stream_handler)
     logger.addHandler(file_handler)
@@ -1182,3 +1183,152 @@ if __name__ == '__main__':
             sample_list = content.split('\n')
             sample_list = [x.strip() for x in sample_list]
             sample_list = [x for x in sample_list if x != '']
+
+    if args.only_compare == False:
+
+        ##### SNPs COMPARISON using tsv variant files #####
+
+        logger.info('\n\n' + BLUE + BOLD + 'STARTING COMPARISON IN GROUP: ' +
+                    group_name + END_FORMATTING + '\n')
+
+        today = str(datetime.date.today())
+        check_create_dir(output_dir)
+        folder_compare = today + "_" + group_name
+        path_compare = os.path.join(output_dir, folder_compare)
+        check_create_dir(path_compare)
+        full_path_compare = os.path.join(path_compare, group_name)
+
+        compare_snp_matrix_recal = full_path_compare + ".revised.final.tsv"
+        compare_snp_matrix_recal_intermediate = full_path_compare + ".revised_intermediate.tsv"
+        compare_snp_matrix_recal_mpileup = full_path_compare + \
+            ".revised_intermediate_vcf.tsv"
+        compare_snp_matrix_INDEL_intermediate = full_path_compare + \
+            ".revised_INDEL_intermediate.tsv"
+
+        # Create intermediate
+
+        prior = datetime.datetime.now()
+
+        recalibrated_snp_matrix_intermediate = ddbb_create_intermediate(
+            out_variant_dir, out_stats_coverage_dir, min_freq_discard=0.1, min_alt_dp=10, only_snp=False, samples=sample_list)
+        recalibrated_snp_matrix_intermediate.to_csv(
+            compare_snp_matrix_recal_intermediate, sep='\t', index=False)
+
+        after = datetime.datetime.now()
+        print(
+            ('\n' + "Done with function ddbb_create_intermediate in: %s" %
+             (after - prior) + "\n")
+        )
+
+        # Recalibrate intermediate with VCF
+
+        prior = datetime.datetime.now()
+
+        recalibrated_snp_matrix_mpileup = recalibrate_ddbb_vcf_intermediate(
+            compare_snp_matrix_recal_intermediate, out_variant_dir, min_cov_low_freq=10)
+        recalibrated_snp_matrix_mpileup.to_csv(
+            compare_snp_matrix_recal_mpileup, sep='\t', index=False)
+
+        after = datetime.datetime.now()
+        print(
+            ('\n' + "Done with function recalibrate_ddbb_vcf_intermediate in: %s" %
+             (after - prior) + "\n")
+        )
+
+        # Remove SNPs located within INDELs
+
+        prior = datetime.datetime.now()
+
+        compare_snp_matrix_INDEL_intermediate_df = remove_position_range(
+            recalibrated_snp_matrix_mpileup)
+        compare_snp_matrix_INDEL_intermediate_df.to_csv(
+            compare_snp_matrix_INDEL_intermediate, sep='\t', index=False)
+
+        after = datetime.datetime.now()
+        print(
+            ("Done with function remove_position_range in: %s" %
+             (after - prior) + "\n")
+        )
+
+        # Extract all positions marked as complex
+
+        prior = datetime.datetime.now()
+
+        complex_variants = extract_complex_list(out_variant_dir)
+        logger.debug('Complex positions in all samples:\n{}'.format(
+            (','.join([str(x) for x in complex_variants]))))
+
+        after = datetime.datetime.now()
+        print(
+            ("Done with function extract_complex_list in: %s" %
+             (after - prior) + "\n")
+        )
+
+        # Clean all faulty positions and samples for final table
+
+        prior = datetime.datetime.now()
+
+        if args.complex:
+            remove_complex_positions = complex_variants
+        else:
+            remove_complex_positions = False
+
+        recalibrated_revised_INDEL_df = revised_df(compare_snp_matrix_INDEL_intermediate_df, path_compare, complex_pos=remove_complex_positions, min_freq_include=0.8, min_threshold_discard_uncov_sample=args.min_threshold_discard_uncov_sample, min_threshold_discard_uncov_pos=args.min_threshold_discard_uncov_pos, min_threshold_discard_htz_sample=args.min_threshold_discard_htz_sample,
+                                                   min_threshold_discard_htz_pos=args.min_threshold_discard_htz_pos, min_threshold_discard_all_pos=args.min_threshold_discard_all_pos, min_threshold_discard_all_sample=args.min_threshold_discard_all_sample, remove_faulty=True, drop_samples=True, drop_positions=True, windows_size_discard=args.window)
+        recalibrated_revised_INDEL_df.to_csv(
+            compare_snp_matrix_recal, sep='\t', index=False)
+
+        after = datetime.datetime.now()
+        print(
+            ("Done with function revised_df in: %s" %
+             (after - prior) + "\n")
+        )
+
+        # Matrix to pairwise and nwk
+
+        prior = datetime.datetime.now()
+
+        ddtb_compare(compare_snp_matrix_recal, distance=5)
+
+        after = datetime.datetime.now()
+        print(
+            ("Done with function ddtb_compare in: %s" %
+             (after - prior) + "\n")
+        )
+
+        logger.info('\n' + MAGENTA + BOLD + 'COMPARISON FINISHED IN GROUP: ' +
+                    group_name + END_FORMATTING + '\n')
+
+        logger.info(
+            "\n"
+            + MAGENTA
+            + BOLD
+            + "##### END OF ONT VARIANT CALLING PIPELINE #####"
+            + "\n"
+            + END_FORMATTING
+        )
+
+    else:
+
+        prior = datetime.datetime.now()
+
+        compare_matrix = os.path.abspath(args.only_compare)
+        ddtb_compare(compare_matrix, distance=args.distance)
+
+        after = datetime.datetime.now()
+        print(
+            ("Done with function ddtb_compare in: %s" %
+             (after - prior) + "\n")
+        )
+
+        logger.info('\n' + MAGENTA + BOLD + 'COMPARISON FINISHED IN GROUP: ' +
+                    group_name + END_FORMATTING + '\n')
+
+        logger.info(
+            "\n"
+            + MAGENTA
+            + BOLD
+            + "##### END OF ONT VARIANT CALLING PIPELINE #####"
+            + "\n"
+            + END_FORMATTING
+        )
