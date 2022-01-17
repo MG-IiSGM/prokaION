@@ -228,7 +228,7 @@ def get_arguments():
         type=int,
         default=50,
         required=False,
-        help="Minimum percentage of coverage at 20X to clasify as uncovered. Default: 50%",
+        help="Minimum percentage of coverage at 20X to clasify as uncovered. Default: 50",
     )
 
     quality_group.add_argument(
@@ -342,7 +342,7 @@ def get_arguments():
         "--min_threshold_discard_uncov_pos",
         required=False,
         type=float,
-        default=0.6,
+        default=0.5,
         help="Minimum covered position to discard it. Default: 0.6",
     )
 
@@ -358,7 +358,7 @@ def get_arguments():
         "--min_threshold_discard_htz_pos",
         required=False,
         type=float,
-        default=0.6,
+        default=0.5,
         help="Minimum heterozygosity to discard a position. Default: 0.6",
     )
 
@@ -374,7 +374,7 @@ def get_arguments():
         "--min_threshold_discard_all_pos",
         required=False,
         type=float,
-        default=0.6,
+        default=0.5,
         help="Minimum inaccuracies to discard a position. Default: 0.6",
     )
 
@@ -1424,7 +1424,7 @@ if __name__ == "__main__":
          (after - prior) + "\n")
     )
 
-    logger.info('\n\n' + MAGENTA + BOLD + 'COMPARISON FINISHED IN GROUP: ' +
+    logger.info('\n' + MAGENTA + BOLD + 'COMPARISON FINISHED IN GROUP: ' +
                 group_name + END_FORMATTING + '\n')
 
     logger.info(

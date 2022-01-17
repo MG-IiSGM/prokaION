@@ -45,9 +45,151 @@ def get_arguments():
         description="Pipeline to compare variants (SNVs) with any non model organism. Specialised in Mycobacterium tuberculosis",
     )
 
+    parser.add_argument(
+        '-i',
+        '--input',
+        dest="input_dir",
+        metavar="input_directory",
+        type=str,
+        required=False,
+        help='REQUIRED. Input directory containing all vcf files',
+    )
+
+    parser.add_argument(
+        '-s',
+        '--sample_list',
+        default=False,
+        required=False,
+        help='File with sample names to analyse instead of all samples',
+    )
+
+    parser.add_argument(
+        '-d',
+        '--distance',
+        default=0,
+        required=False,
+        help='Minimun distance to cluster groups after comparison',
+    )
+
+    parser.add_argument(
+        '-c',
+        '--only-compare',
+        dest="only_compare",
+        required=False,
+        default=False,
+        help='Add already calculated snp binary matrix',
+    )
+
+    parser.add_argument(
+        '-r',
+        '--recalibrate',
+        required=False,
+        type=str,
+        default=False,
+        help='Coverage folder',
+    )
+
+    parser.add_argument(
+        '-b',
+        '--bam_folder',
+        required=False,
+        type=str,
+        default=False,
+        help='Bam folder',
+    )
+
+    parser.add_argument(
+        '-w',
+        '--window',
+        required=False,
+        type=int,
+        default=2,
+        help='Number of snps in 10 to discard. Default: 2',
+    )
+
+    parser.add_argument(
+        '-C',
+        '--complex',
+        required=False,
+        action='store_true',
+        help='Remove complex positions',
+    )
+
+    parser.add_argument(
+        '-R',
+        '--reference',
+        required=False,
+        type=str,
+        default=False,
+        help='Reference fasta file used in original variant calling',
+    )
+
+    parser.add_argument(
+        "--min_threshold_discard_uncov_sample",
+        required=False,
+        type=float,
+        default=0.6,
+        help="Minimum uncovered genome to discard a sample. Default: 0.6",
+    )
+
+    parser.add_argument(
+        "--min_threshold_discard_uncov_pos",
+        required=False,
+        type=float,
+        default=0.5,
+        help="Minimum covered position to discard it. Default: 0.6",
+    )
+
+    parser.add_argument(
+        "--min_threshold_discard_htz_sample",
+        required=False,
+        type=float,
+        default=0.6,
+        help="Minimum heterozygosity to discard a sample. Default: 0.6",
+    )
+
+    parser.add_argument(
+        "--min_threshold_discard_htz_pos",
+        required=False,
+        type=float,
+        default=0.5,
+        help="Minimum heterozygosity to discard a position. Default: 0.6",
+    )
+
+    parser.add_argument(
+        "--min_threshold_discard_all_sample",
+        required=False,
+        type=float,
+        default=0.6,
+        help="Minimum inaccuracies to discard a sample. Default: 0.6",
+    )
+
+    parser.add_argument(
+        "--min_threshold_discard_all_pos",
+        required=False,
+        type=float,
+        default=0.5,
+        help="Minimum inaccuracies to discard a position. Default: 0.6",
+    )
+
+    parser.add_argument('-o',
+                        '--output',
+                        type=str,
+                        required=True,
+                        help='Name of all the output files, might include path',
+                        )
+
     arguments = parser.parse_args()
 
     return arguments
+
+
+def check_create_dir(path):
+
+    if os.path.exists(path):
+        pass
+    else:
+        os.mkdir(path)
 
 
 def check_file_exists(file_name):
@@ -984,3 +1126,59 @@ def ddtb_compare(final_database, distance=0):
     # Output files with group/cluster assigned to samples
     logger.info(CYAN + "Assigning clusters" + END_FORMATTING)
     matrix_to_cluster(pairwise_file, snp_dist_file, distance=distance)
+
+
+if __name__ == '__main__':
+
+    args = get_arguments()
+
+    output_dir = os.path.abspath(args.output)
+    group_name = output_dir.split('/')[-1]
+    check_create_dir(output_dir)
+
+    ##### LOGGING #####
+
+    # Create log file with date and time
+
+    right_now = str(datetime.datetime.now())
+    right_now_full = '_'.join(right_now.split(' '))
+    log_filename = group_name + '_' + right_now_full + '.log'
+    log_folder = os.path.join(output_dir, 'Logs')
+    check_create_dir(log_folder)
+    log_full_path = os.path.join(log_folder, log_filename)
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+
+    formatter = logging.Formatter('%(asctime)s:%(message)s')
+
+    file_handler = logging.FileHandler(log_full_path)
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    stream_handler.setFormatter(formatter)
+
+    logger.addHandler(stream_handler)
+    logger.addHandler(file_handler)
+
+    logger.info('########## COMPARE SNPs ##########')
+    logger.info(args)
+
+    group_compare = os.path.join(output_dir, group_name)
+    compare_snp_matrix = group_compare + '.tsv'
+    input_dir = os.path.abspath(args.input_dir)
+
+    out_variant_dir = os.path.join(input_dir, 'Variants')
+    out_stats_dir = os.path.join(input_dir, 'Stats')
+    out_stats_coverage_dir = os.path.join(
+        out_stats_dir, 'Coverage')  # Subfolder
+
+    if args.sample_list:
+        sample_file = os.path.abspath(args.sample_list)
+        with open(sample_file, 'r') as f:
+            content = f.read()
+            sample_list = content.split('\n')
+            sample_list = [x.strip() for x in sample_list]
+            sample_list = [x for x in sample_list if x != '']
