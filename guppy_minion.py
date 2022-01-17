@@ -259,7 +259,8 @@ def rename_files(out_barcoding_dir, out_samples_dir, summary=False):
             # print(barcode,sample)
             barcode_path = os.path.join(out_barcoding_dir, barcode)
             # print(barcode_path)
-            output_samples = os.path.join(out_samples_dir, sample.strip() + ".fastq")
+            output_samples = os.path.join(
+                out_samples_dir, sample.strip() + ".fastq")
             output_samples_gz = os.path.join(
                 out_samples_dir, sample.strip() + ".fastq.gz"
             )
@@ -288,7 +289,8 @@ def rename_files(out_barcoding_dir, out_samples_dir, summary=False):
                         + END_FORMATTING
                     )
                 else:
-                    logger.info(GREEN + "Renaming sample " + sample + END_FORMATTING)
+                    logger.info(GREEN + "Renaming sample " +
+                                sample + END_FORMATTING)
                     with open(output_samples, "w+") as bc_output:
                         for bc_line in sum_files:
                             with gzip.open(bc_line, "rb") as bcl:
@@ -318,9 +320,11 @@ def ONT_filtering(out_samples_dir, out_samples_filtered_dir):
                 # print(name)
                 filename = os.path.join(root, name)
                 # print(filename)
-                HQ_filename = os.path.basename(filename.split(".")[0] + ".fastq.gz")
+                HQ_filename = os.path.basename(
+                    filename.split(".")[0] + ".fastq.gz")
                 # print(HQ_filename)
-                filename_out = os.path.join(out_samples_filtered_dir, HQ_filename)
+                filename_out = os.path.join(
+                    out_samples_filtered_dir, HQ_filename)
                 # print(filename_out)
 
                 if os.path.isfile(filename_out):
@@ -334,7 +338,8 @@ def ONT_filtering(out_samples_dir, out_samples_filtered_dir):
                         + END_FORMATTING
                     )
                 else:
-                    logger.info(GREEN + "Filter sample " + name + END_FORMATTING)
+                    logger.info(GREEN + "Filter sample " +
+                                name + END_FORMATTING)
                     cmd_filtering = "gunzip -c {} | NanoFilt -q {} | gzip > {}".format(
                         filename, str(7), filename_out
                     )
@@ -358,7 +363,8 @@ def ONT_quality(out_samples_filtered_dir, out_qc_dir, threads=30):
             )
             check_create_dir(HQ_outqc)
             # print(HQ_outqc)
-            HQ_outreport = [x for x in os.listdir(HQ_outqc) if "NanoPlot-report" in x]
+            HQ_outreport = [x for x in os.listdir(
+                HQ_outqc) if "NanoPlot-report" in x]
             HQ_outreport_file = os.path.join(HQ_outqc, "".join(HQ_outreport))
             # print(HQ_outreport)
 
@@ -459,10 +465,12 @@ if __name__ == "__main__":
 
     out_basecalling_dir = os.path.join(output_dir, "Basecalling")
     check_create_dir(out_basecalling_dir)
-    basecalling_summary = os.path.join(out_basecalling_dir, "sequencing_summary.txt")
+    basecalling_summary = os.path.join(
+        out_basecalling_dir, "sequencing_summary.txt")
     out_barcoding_dir = os.path.join(output_dir, "Barcoding")
     check_create_dir(out_barcoding_dir)
-    barcoding_summary = os.path.join(out_barcoding_dir, "barcoding_summary.txt")
+    barcoding_summary = os.path.join(
+        out_barcoding_dir, "barcoding_summary.txt")
     out_samples_dir = os.path.join(output_dir, "Samples_Fastq")
     check_create_dir(out_samples_dir)
     out_samples_filtered_dir = os.path.join(out_samples_dir, "Filtered_Fastq")
@@ -485,7 +493,8 @@ if __name__ == "__main__":
             "\n" + YELLOW + BOLD + "Ommiting BASECALLING" + END_FORMATTING + "\n"
         )
     else:
-        logger.info("\n" + GREEN + "STARTING BASECALLING" + END_FORMATTING + "\n")
+        logger.info("\n" + GREEN + "STARTING BASECALLING" +
+                    END_FORMATTING + "\n")
         basecalling_ion(
             input_dir,
             out_basecalling_dir,
@@ -546,7 +555,8 @@ if __name__ == "__main__":
     after = datetime.datetime.now()
     print(
         (
-            "Done with function rename_files & ONT_filtering in: %s" % (after - prior)
+            "Done with function rename_files & ONT_filtering in: %s" % (
+                after - prior)
             + "\n"
         )
     )
@@ -580,4 +590,3 @@ if __name__ == "__main__":
         + "\n"
         + END_FORMATTING
     )
-
