@@ -80,7 +80,7 @@ def get_arguments():
         "--samples",
         metavar="Samples",
         type=str,
-        required=False,
+        required=True,
         help="REQUIRED. Sample list for conversion from barcode to samples ID",
     )
 
