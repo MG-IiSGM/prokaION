@@ -46,7 +46,8 @@ from compare_snp_prokaion import (
     remove_position_range,
     extract_complex_list,
     revised_df,
-    ddtb_compare
+    ddtb_compare,
+    remove_bed_positions
 )
 
 
@@ -1346,15 +1347,33 @@ if __name__ == "__main__":
         min_alt_dp=10,
         only_snp=False,
     )
-    recalibrated_snp_matrix_intermediate.to_csv(
-        compare_snp_matrix_recal_intermediate, sep="\t", index=False
-    )
+    # recalibrated_snp_matrix_intermediate.to_csv(
+    #     compare_snp_matrix_recal_intermediate, sep="\t", index=False
+    # )
 
     after = datetime.datetime.now()
     print(
         ("Done with function ddbb_create_intermediate in: %s" %
          (after - prior) + "\n")
     )
+
+    # Remove SNPs from BED file (PE/PPE)
+
+    if args.remove_bed:
+
+        prior = datetime.datetime.now()
+
+        recalibrated_snp_matrix_intermediate = remove_bed_positions(
+            recalibrated_snp_matrix_intermediate, args.remove_bed)
+
+        after = datetime.datetime.now()
+        print(
+            ('\n' + "Done with function remove_bed_positions in: %s" %
+             (after - prior) + "\n")
+        )
+
+    recalibrated_snp_matrix_intermediate.to_csv(
+        compare_snp_matrix_recal_intermediate, sep="\t", index=False)
 
     # Recalibrate intermediate with VCF
 

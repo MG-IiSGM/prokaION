@@ -117,6 +117,15 @@ def get_arguments():
     )
 
     parser.add_argument(
+        '-B',
+        '--remove_bed',
+        required=False,
+        type=str,
+        default=False,
+        help='BED file with positions to remove'
+    )
+
+    parser.add_argument(
         '-R',
         '--reference',
         required=False,
@@ -417,6 +426,51 @@ def ddbb_create_intermediate(
     df = df[['Position', 'N', 'Samples'] +
             [col for col in df.columns if col not in ['Position', 'N', 'Samples']]]
 
+    return df
+
+
+def bed_to_df(bed_file):
+    """
+    Import bed file separated by tabs into a pandas df
+    -Handle header line
+    -Handle with and without description (If there is no description adds true or false to annotated df)
+    """
+    header_lines = 0
+    # Handle likely header by checking colums 2 and 3 as numbers
+    with open(bed_file, 'r') as f:
+        next_line = f.readline().strip()
+        line_split = next_line.split(None)  # This split by any blank character
+        start = line_split[1]
+        end = line_split[2]
+        while not start.isdigit() and not end.isdigit():
+            header_lines = header_lines + 1
+            next_line = f.readline().strip()
+            # This split by any blank character
+            line_split = next_line.split(None)
+            start = line_split[1]
+            end = line_split[2]
+
+    if header_lines == 0:
+        # delim_whitespace=True
+        df = pd.read_csv(bed_file, sep="\t", header=None)
+    else:
+        df = pd.read_csv(bed_file, sep="\t", skiprows=header_lines,
+                         header=None)  # delim_whitespace=True
+
+    df = df.iloc[:, 0:4]
+    df.columns = ["#CHROM", "start", "end", "description"]
+
+    return df
+
+
+def remove_bed_positions(df, bed_file):
+    bed_df = bed_to_df(bed_file)
+    for _, row in df.iterrows():
+        position_number = int(row.Position.split("|")[2])
+        if any(start <= position_number <= end for (start, end) in zip(bed_df.start.values.tolist(), bed_df.end.values.tolist())):
+            logger.info('Position: {} removed found in {}'.format(
+                row.Position, bed_file))
+            df = df[df.Position != row.Position]
     return df
 
 
@@ -1211,14 +1265,32 @@ if __name__ == '__main__':
 
         recalibrated_snp_matrix_intermediate = ddbb_create_intermediate(
             out_variant_dir, out_stats_coverage_dir, min_freq_discard=0.1, min_alt_dp=10, only_snp=False, samples=sample_list)
-        recalibrated_snp_matrix_intermediate.to_csv(
-            compare_snp_matrix_recal_intermediate, sep='\t', index=False)
+        # recalibrated_snp_matrix_intermediate.to_csv(
+        #     compare_snp_matrix_recal_intermediate, sep='\t', index=False)
 
         after = datetime.datetime.now()
         print(
             ('\n' + "Done with function ddbb_create_intermediate in: %s" %
              (after - prior) + "\n")
         )
+
+        # Remove SNPs from BED file (PE/PPE)
+
+        if args.remove_bed:
+
+            prior = datetime.datetime.now()
+
+            recalibrated_snp_matrix_intermediate = remove_bed_positions(
+                recalibrated_snp_matrix_intermediate, args.remove_bed)
+
+            after = datetime.datetime.now()
+            print(
+                ('\n' + "Done with function remove_bed_positions in: %s" %
+                 (after - prior) + "\n")
+            )
+
+        recalibrated_snp_matrix_intermediate.to_csv(
+            compare_snp_matrix_recal_intermediate, sep="\t", index=False)
 
         # Recalibrate intermediate with VCF
 
