@@ -554,8 +554,8 @@ if __name__ == "__main__":
     args = get_arguments()
 
     input_dir = os.path.abspath(args.input_dir)
-    in_samples_filtered_dir = os.path.join(
-        input_dir, "Samples_Fastq/Filtered_Fastq")
+    # in_samples_filtered_dir = os.path.join(
+    #     input_dir, "Samples_Fastq/Filtered_Fastq")
     output_dir = os.path.abspath(args.output)
     group_name = output_dir.split("/")[-1]
     check_create_dir(output_dir)
@@ -599,7 +599,7 @@ if __name__ == "__main__":
 
     # Obtain all fastq files from folder
 
-    fastq = extract_read_list(in_samples_filtered_dir)
+    fastq = extract_read_list(input_dir)
 
     # Check how many files will be analysed
 
@@ -736,7 +736,7 @@ if __name__ == "__main__":
 
             # if not os.path.isfile(output_final_vcf):
             HQ_filename = os.path.join(
-                in_samples_filtered_dir, sample + ".fastq.gz")
+                input_dir, sample + ".fastq.gz")
             # print(HQ_filename)
             # filename_out = sample.split('.')[0].split('_')[1]
             filename_out = sample
@@ -1106,7 +1106,7 @@ if __name__ == "__main__":
     )
 
     uncovered_samples = remove_low_quality(
-        in_samples_filtered_dir,
+        input_dir,
         output_dir,
         min_coverage=args.coverage20,
         min_hq_snp=args.min_snp,

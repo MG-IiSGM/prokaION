@@ -197,7 +197,8 @@ def check_reanalysis(output_dir, samples_to_analyze):
     previous_files = [variant_dir, compare_dir]
 
     # Check how many folders exist
-    file_exist = sum([os.path.exists(x) for x in previous_files])  # True = 1, False = 0
+    file_exist = sum([os.path.exists(x)
+                     for x in previous_files])  # True = 1, False = 0
 
     # Handle reanalysis: First time; reanalysis or realysis with aditional samples
     if file_exist > 0:  # Already analysed
@@ -236,7 +237,7 @@ def file_to_list(file_name):
 
 
 def remove_low_quality(
-    in_samples_filtered_dir,
+    input_dir,
     output_dir,
     min_coverage=30,
     min_hq_snp=8,
@@ -303,7 +304,8 @@ def remove_low_quality(
                             else max(x.strip("()").split(","))
                         )
 
-                    stats_df["HQ_SNP"] = stats_df.apply(lambda x: f(x.HQ_SNP), axis=1)
+                    stats_df["HQ_SNP"] = stats_df.apply(
+                        lambda x: f(x.HQ_SNP), axis=1)
                     stats_df["HQ_SNP"] = stats_df["HQ_SNP"].astype(float)
 
                     # Store samples under any of the parameters indicated
@@ -314,19 +316,23 @@ def remove_low_quality(
                     # print(uncovered_samples)
 
                     # Create a df with only covered to replace the original
-                    covered_df = stats_df[~stats_df["#SAMPLE"].isin(uncovered_samples)]
+                    covered_df = stats_df[~stats_df["#SAMPLE"].isin(
+                        uncovered_samples)]
                     # print(covered_df)
-                    covered_df.to_csv(coverage_stat_file, sep="\t", index=False)
+                    covered_df.to_csv(coverage_stat_file,
+                                      sep="\t", index=False)
 
                     # Create a df with uncovered
-                    uncovered_df = stats_df[stats_df["#SAMPLE"].isin(uncovered_samples)]
+                    uncovered_df = stats_df[stats_df["#SAMPLE"].isin(
+                        uncovered_samples)]
                     uncovered_table_filename = right_now_full + "_uncovered.summary.tab"
                     uncovered_table_file = os.path.join(
                         uncovered_stats_dir, uncovered_table_filename
                     )
 
                     if len(uncovered_samples) > 0:
-                        uncovered_df.to_csv(uncovered_table_file, sep="\t", index=False)
+                        uncovered_df.to_csv(
+                            uncovered_table_file, sep="\t", index=False)
 
                 elif name.endswith(".coverage.summary.tab"):
                     covstats_df = pd.read_csv(filename, sep="\t")
@@ -335,13 +341,14 @@ def remove_low_quality(
     uncovered_samples = [str(x) for x in uncovered_samples]
     # print(uncovered_samples)
 
-    def_covstats_df = covstats_df[~covstats_df["#SAMPLE"].isin(uncovered_samples)]
+    def_covstats_df = covstats_df[~covstats_df["#SAMPLE"].isin(
+        uncovered_samples)]
     def_covstats_df.to_csv(final_covstat, sep="\t", index=False)
 
     logger.debug("Uncovered_samples: ")
     logger.debug(uncovered_samples)
 
-    fastq = extract_read_list(in_samples_filtered_dir)
+    fastq = extract_read_list(input_dir)
     # print(fastq)
 
     sample_list_F = []
@@ -381,7 +388,8 @@ def remove_low_quality(
                 for uncovered in uncovered_samples:
                     filename = os.path.join(root, uncovered)
                     # print(filename)
-                    destination_file = os.path.join(uncovered_dir_variants, uncovered)
+                    destination_file = os.path.join(
+                        uncovered_dir_variants, uncovered)
                     # print(destination_file)
                     if not os.path.exists(destination_file):
                         logger.debug(
@@ -391,7 +399,8 @@ def remove_low_quality(
                         )
                         shutil.move(filename, destination_file)
                     else:
-                        logger.debug("{} already exist".format(destination_file))
+                        logger.debug(
+                            "{} already exist".format(destination_file))
 
     # Move Bam, Consensus and Stats files to Uncovered folder
 
@@ -465,7 +474,8 @@ def create_reference_chunks(reference):
     ref_size = optimal_chunk_size(reference)
     min_freebayes_chunk_size = 1000
     chunk_cpu = multiprocessing.cpu_count() - 2
-    num_chunks = round(max(min_freebayes_chunk_size, int(ref_size) / chunk_cpu))
+    num_chunks = round(
+        max(min_freebayes_chunk_size, int(ref_size) / chunk_cpu))
 
     input_reference = os.path.abspath(reference)
     input_folder = os.path.dirname(reference)
@@ -587,7 +597,8 @@ def obtain_group_cov_stats(directory, group_name):
         df_stat = pd.read_csv(output_file, sep="\t")
         samples_to_skip = df_stat["#SAMPLE"].tolist()
         logger.debug(
-            "Skipped samples for coverage calculation:" + (",").join(samples_to_skip)
+            "Skipped samples for coverage calculation:" +
+            (",").join(samples_to_skip)
         )
 
     columns = [
@@ -767,7 +778,8 @@ def obtain_overal_stats(out_stats_dir, output_dir, group):
         df_stat = pd.read_csv(overal_stat_file, sep="\t")
         samples_to_skip = df_stat["#SAMPLE"].tolist()
         logger.debug(
-            "Skipped samples for coverage calculation:" + (",").join(samples_to_skip)
+            "Skipped samples for coverage calculation:" +
+            (",").join(samples_to_skip)
         )
 
     for root, _, files in os.walk(out_stats_dir):
@@ -781,7 +793,8 @@ def obtain_overal_stats(out_stats_dir, output_dir, group):
                 # print(df)
                 if df.shape[0] > 0:
                     df[["HQ_SNP", "HTZ_SNP", "INDELS"]] = df.parallel_apply(
-                        lambda x: extract_snp_count(out_variant_dir, x["#SAMPLE"]),
+                        lambda x: extract_snp_count(
+                            out_variant_dir, x["#SAMPLE"]),
                         axis=1,
                         result_type="expand",
                     )
@@ -803,7 +816,8 @@ def obtain_overal_stats(out_stats_dir, output_dir, group):
                             "N_mean_len",
                         ]
                     ] = df.parallel_apply(
-                        lambda x: extract_n_consensus(out_consensus_dir, x["#SAMPLE"]),
+                        lambda x: extract_n_consensus(
+                            out_consensus_dir, x["#SAMPLE"]),
                         axis=1,
                         result_type="expand",
                     )
@@ -887,7 +901,8 @@ def import_VCF42_freebayes_to_tsv(vcf_file, sep="\t"):
                                 ","
                             )[0]
                         )
-                    output_line = ("\t").join(line_split[:7] + extra_field_list)
+                    output_line = ("\t").join(
+                        line_split[:7] + extra_field_list)
                     fout.write(output_line + "\n")
 
 
@@ -1067,7 +1082,8 @@ def import_annot_to_pandas(vcf_file, sep="\t"):
             next_line = f.readline()
 
     # Use first line as header
-    df = pd.read_csv(vcf_file, sep=sep, skiprows=[header_lines], header=header_lines)
+    df = pd.read_csv(vcf_file, sep=sep, skiprows=[
+                     header_lines], header=header_lines)
 
     ann_headers = [
         "Allele",
@@ -1098,7 +1114,8 @@ def import_annot_to_pandas(vcf_file, sep="\t"):
     for head in anlelle_headers:
         df[head] = df[head].str.split("=").str[-1]
 
-    df["TMP_ANN_16"] = df["INFO"].apply(lambda x: ("|").join(x.split("|")[0:15]))
+    df["TMP_ANN_16"] = df["INFO"].apply(
+        lambda x: ("|").join(x.split("|")[0:15]))
 
     df.INFO = df.INFO.str.split("ANN=").str[-1]
 
@@ -1111,7 +1128,8 @@ def import_annot_to_pandas(vcf_file, sep="\t"):
         .rename("INFO")
     ).reset_index(drop=True)
 
-    df["TMP_ANN_16"] = df["INFO"].apply(lambda x: ("|").join(x.split("|")[0:15]))
+    df["TMP_ANN_16"] = df["INFO"].apply(
+        lambda x: ("|").join(x.split("|")[0:15]))
     df[ann_headers] = df["TMP_ANN_16"].str.split("|", expand=True)
     df["HGVS.c"] = df["HGVS.c"].str.split(".").str[-1]
     df["HGVS.p"] = df["HGVS.p"].str.split(".").str[-1].replace("", "-")
@@ -1324,8 +1342,10 @@ def make_blast(
 
     blast_command = "blastn" if query_type == "nucl" else "blastp"
     database_name = database.split("/")[-1].split(".")[0]
-    output_database_tmp = os.path.join(output_folder, database_name + ".blast.tmp")
-    output_blast = os.path.join(output_folder, sample + "." + database_name + ".blast")
+    output_database_tmp = os.path.join(
+        output_folder, database_name + ".blast.tmp")
+    output_blast = os.path.join(
+        output_folder, sample + "." + database_name + ".blast")
     blastdb_cmd = [
         "makeblastdb",
         "-in",
