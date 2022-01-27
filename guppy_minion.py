@@ -493,8 +493,6 @@ if __name__ == "__main__":
             "\n" + YELLOW + BOLD + "Ommiting BASECALLING" + END_FORMATTING + "\n"
         )
     else:
-        logger.info("\n" + GREEN + "STARTING BASECALLING" +
-                    END_FORMATTING + "\n")
         basecalling_ion(
             input_dir,
             out_basecalling_dir,
