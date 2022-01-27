@@ -341,7 +341,7 @@ def ONT_filtering(out_samples_dir, out_samples_filtered_dir):
                     logger.info(GREEN + "Filter sample " +
                                 name + END_FORMATTING)
                     cmd_filtering = "gunzip -c {} | NanoFilt -q {} | gzip > {}".format(
-                        filename, str(7), filename_out
+                        filename, str(10), filename_out
                     )
                     # print(cmd_filtering)
                     execute_subprocess(cmd_filtering, isShell=True)

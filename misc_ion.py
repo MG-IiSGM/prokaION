@@ -310,7 +310,7 @@ def remove_low_quality(
 
                     # Store samples under any of the parameters indicated
                     uncovered_samples = stats_df["#SAMPLE"][
-                        (stats_df["UNMMAPED_PROP"] >= min_coverage)
+                        (stats_df["UNMAPPED_PROP"] >= min_coverage)
                         | (stats_df["HQ_SNP"] < min_hq_snp)
                     ].tolist()
                     # print(uncovered_samples)
