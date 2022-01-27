@@ -473,7 +473,7 @@ def freebayes_variant(
     frequency=0.1,
     ploidy=1,
     base_qual=7,
-    map_qual=5,
+    map_qual=60,
 ):
     """
     https://github.com/freebayes/freebayes
