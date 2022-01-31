@@ -262,8 +262,7 @@ def rename_files(out_barcoding_dir, out_samples_dir, summary=False):
             output_samples = os.path.join(
                 out_samples_dir, sample.strip() + ".fastq")
             output_samples_gz = os.path.join(
-                out_samples_dir, sample.strip() + ".fastq.gz"
-            )
+                out_samples_dir, sample.strip() + ".fastq.gz")
             # print(output_samples)
 
             sum_files = []

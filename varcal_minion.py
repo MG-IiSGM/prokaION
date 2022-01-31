@@ -58,7 +58,7 @@ logger = logging.getLogger()
 HEADER
 =============================================================
 Institution: IiSGM
-Author: Sergio Buenestado-Serrano (sergio.buenestado@gmail.com)
+Author: Sergio Buenestado-Serrano (sergio.buenestado@gmail.com) & Pedro J. Sola (pedroscampoy@gmail.com)
 Version = 0
 Created: 22 November 2021
 
