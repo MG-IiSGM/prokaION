@@ -567,16 +567,6 @@ if __name__ == "__main__":
     after = datetime.datetime.now()
     print(("Done with function ONT_quality in: %s" % (after - prior) + "\n"))
 
-    # MinION data correction
-
-    # prior = datetime.datetime.now()
-
-    # logger.info('\n' + GREEN + "MinION data correction" + END_FORMATTING)
-
-    # after = datetime.datetime.now()
-    # print(('Done with function XXX in: %s' %
-    #           (after - prior) + '\n'))
-
     logger.info(
         "\n"
         + MAGENTA
