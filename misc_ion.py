@@ -72,7 +72,7 @@ def execute_subprocess(cmd, isShell=False, isInfo=False):
     logger.debug("")
     logger.debug(cmd)
 
-    if cmd[0] == "samtools" or cmd[0] == "bwa" or cmd[0] == "artic":
+    if cmd[0] == "samtools" or cmd[0] == "bwa":
         prog = " ".join(cmd[0:2])
         param = cmd[3:]
     else:

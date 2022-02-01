@@ -276,8 +276,6 @@ def rename_files(out_barcoding_dir, out_samples_dir, summary=False):
                     + "Processing {} files in {}".format(len(sum_files), barcode)
                     + END_FORMATTING
                 )
-                # print(sum_files)
-                # if len(sum_files) > 1:
                 if os.path.isfile(output_samples_gz):
                     logger.info(
                         YELLOW
