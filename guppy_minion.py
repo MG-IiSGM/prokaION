@@ -113,8 +113,8 @@ def get_arguments():
         "--barcode_kit",
         type=str,
         required=False,
-        default="EXP-NBD196",
-        help="Kit of barcodes used",
+        default="SQK-RBK110-96",
+        help="Kit of barcodes used [SQK-RBK110-96|EXP-NBD196]. Default: SQK-RBK110-96",
     )
 
     parser.add_argument(
@@ -197,7 +197,7 @@ def barcoding_ion(
     out_basecalling_dir,
     out_barcoding_dir,
     require_barcodes_both_ends=False,
-    barcode_kit="EXP-NBD196",
+    barcode_kit="SQK-RBK110-96",
     threads=30,
 ):
 

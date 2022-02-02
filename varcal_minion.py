@@ -631,13 +631,13 @@ if __name__ == "__main__":
         CYAN
         + "\n%d samples will be analysed: %s"
         % (len(sample_list_F), ",".join(sample_list_F))
-        + END_FORMATTING
+        + END_FORMATTING + '\n'
     )
     logger.info(
         CYAN
         + "\n%d NEW samples will be analysed: %s"
         % (len(new_samples), ",".join(new_samples))
-        + END_FORMATTING
+        + END_FORMATTING + '\n'
     )
 
     # Declare folders created in pipeline and key files
