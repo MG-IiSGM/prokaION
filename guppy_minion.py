@@ -210,6 +210,10 @@ def barcoding_ion(
     # --barcode_kits: Space separated list of barcoding kit(s) or expansion kit(s) to detect against. Must be in double quotes
     # --require_barcodes_both_ends: Reads will only be classified if there is a barcode above the min_score at both ends of the read
 
+    # --trim_barcodes: Trim the barcodes from the sequences in the output files.
+    # --trim_adapters: Trim the adapters from the sequences in the output files.
+    # --trim_primers: Trim the primers from the sequences in the output files.
+
     if require_barcodes_both_ends:
         logger.info(
             GREEN
