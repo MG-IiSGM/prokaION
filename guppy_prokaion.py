@@ -213,6 +213,9 @@ def barcoding_ion(
     # --trim_barcodes: Trim the barcodes from the sequences in the output files.
     # --trim_adapters: Trim the adapters from the sequences in the output files.
     # --trim_primers: Trim the primers from the sequences in the output files.
+    # --detect_barcodes: Detect barcode sequences at the front and rear of the read.
+    # --detect_adapter: Detect adapter sequences at the front and rear of the read.
+    # --detect_primer: Detect primer sequences at the front and rear of the read.
 
     if require_barcodes_both_ends:
         logger.info(
@@ -245,6 +248,8 @@ def barcoding_ion(
         barcode_kit,
         "-t",
         str(threads),
+        '--detect_barcodes',
+        '--trim_barcodes',
         "--fastq_out",
         "--compress_fastq",
     ]
