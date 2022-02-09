@@ -13,7 +13,7 @@ import multiprocessing
 
 # Local application imports
 
-from misc_ion import (
+from misc_prokaion import (
     check_create_dir,
     check_file_exists,
     extract_read_list,
@@ -651,10 +651,8 @@ if __name__ == "__main__":
         # Extract sample name
         sample = extract_sample_list(sample)
         args.sample = sample
-        if sample in sample_list_F:
-            # Variant sample dir
-            sample_variant_dir = os.path.join(out_variant_dir, sample)
 
+        if sample in sample_list_F:
             sample_number = str(sample_list_F.index(sample) + 1)
             sample_total = str(len(sample_list_F))
 
@@ -691,9 +689,6 @@ if __name__ == "__main__":
                     + ")"
                     + END_FORMATTING
                 )
-
-            # output_final_vcf = os.path.join(
-            #     sample_variant_dir, 'snps.all.ivar.tsv')
 
             ##### MAPPING #####
 
