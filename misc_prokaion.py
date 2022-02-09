@@ -965,7 +965,7 @@ def ivar_consensus(
     filename_bam_out,
     out_consensus_dir,
     filename_out,
-    min_quality=10,
+    min_quality=15,
     min_frequency_threshold=0.7,
     min_depth=8,
     uncovered_character="N",
