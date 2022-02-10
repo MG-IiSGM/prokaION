@@ -147,7 +147,7 @@ def get_arguments():
         required=False,
         type=float,
         default=0.5,
-        help="Minimum covered position to discard it. Default: 0.6",
+        help="Minimum covered position to discard it. Default: 0.5",
     )
 
     parser.add_argument(
@@ -163,7 +163,7 @@ def get_arguments():
         required=False,
         type=float,
         default=0.5,
-        help="Minimum heterozygosity to discard a position. Default: 0.6",
+        help="Minimum heterozygosity to discard a position. Default: 0.5",
     )
 
     parser.add_argument(
@@ -179,15 +179,11 @@ def get_arguments():
         required=False,
         type=float,
         default=0.5,
-        help="Minimum inaccuracies to discard a position. Default: 0.6",
+        help="Minimum inaccuracies to discard a position. Default: 0.5",
     )
 
-    parser.add_argument('-o',
-                        '--output',
-                        type=str,
-                        required=True,
-                        help='Name of all the output files, might include path',
-                        )
+    parser.add_argument('-o', '--output', type=str, required=True,
+                        help='Name of all the output files, might include path',)
 
     arguments = parser.parse_args()
 
