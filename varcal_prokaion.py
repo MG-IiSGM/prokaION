@@ -1272,7 +1272,7 @@ if __name__ == "__main__":
 
     logger.info(
         "\n\n"
-        + BLUE
+        + GREEN
         + BOLD
         + "STARTING COMPARISON IN GROUP: "
         + group_name
