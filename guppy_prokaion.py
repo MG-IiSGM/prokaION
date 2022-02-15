@@ -11,7 +11,7 @@ import gzip
 
 # Local application imports
 
-from misc_ion import (
+from misc_prokaion import (
     check_create_dir,
     extract_read_list,
     extract_sample_list,
@@ -113,8 +113,8 @@ def get_arguments():
         "--barcode_kit",
         type=str,
         required=False,
-        default="SQK-RBK110-96",
-        help="Kit of barcodes used [SQK-RBK110-96|EXP-NBD196]. Default: SQK-RBK110-96",
+        default="EXP-NBD104",
+        help="Kit of barcodes used [EXP-NBD104|SQK-RBK110-96|EXP-NBD196]. Default: EXP-NBD104",
     )
 
     parser.add_argument(
