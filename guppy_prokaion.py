@@ -53,9 +53,7 @@ DIM = "\033[2m"
 def get_arguments():
 
     parser = argparse.ArgumentParser(
-        prog="guppy_minion.py",
-        description="Pipeline to basecalling and barcoding fast5 files from MinION sequencing",
-    )
+        prog="guppy_prokaion.py", description="Pipeline to basecalling and barcoding fast5 files from MinION sequencing")
 
     parser.add_argument(
         "-i",
@@ -197,7 +195,7 @@ def barcoding_ion(
     out_basecalling_dir,
     out_barcoding_dir,
     require_barcodes_both_ends=False,
-    barcode_kit="SQK-RBK110-96",
+    barcode_kit="EXP-NBD104",
     threads=30,
 ):
 
@@ -209,6 +207,8 @@ def barcoding_ion(
     # --compress_fastq: Compress fastq output files with gzip
     # --barcode_kits: Space separated list of barcoding kit(s) or expansion kit(s) to detect against. Must be in double quotes
     # --require_barcodes_both_ends: Reads will only be classified if there is a barcode above the min_score at both ends of the read
+    # --records_per_fastq: Maximum number of records per fastq file, 0 means use a single file (per worker, per run id)
+    # --allow_inferior_barcodes: Reads will still be classified even if both the barcodes at the front and rear (if applicable) were not the best scoring barcodes above the min_score.
 
     # --trim_barcodes: Trim the barcodes from the sequences in the output files.
     # --trim_adapters: Trim the adapters from the sequences in the output files.
@@ -216,6 +216,9 @@ def barcoding_ion(
     # --detect_barcodes: Detect barcode sequences at the front and rear of the read.
     # --detect_adapter: Detect adapter sequences at the front and rear of the read.
     # --detect_primer: Detect primer sequences at the front and rear of the read.
+
+    # --min_score_barcode_front: Minimum score to consider a front barcode to be a valid barcode alignment (Default: 60).
+    # --min_score_barcode_rear: Minimum score to consider a rear barcode to be a valid alignment (and min_score_front will then be used for the front only when this is set).
 
     if require_barcodes_both_ends:
         logger.info(
@@ -244,14 +247,14 @@ def barcoding_ion(
         out_barcoding_dir,
         "-r",
         require_barcodes_both_ends,
-        "--barcode_kit",
+        "--barcode_kits",
         barcode_kit,
         "-t",
         str(threads),
         '--detect_barcodes',
         '--trim_barcodes',
         "--fastq_out",
-        "--compress_fastq",
+        "--compress_fastq"
     ]
 
     print(cmd)

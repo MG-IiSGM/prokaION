@@ -367,14 +367,10 @@ def remove_low_quality(
                 uncovered_index = sample_list_F.index(uncovered_sample)
                 # print(uncovered_index)
                 destination_fastq = os.path.join(
-                    uncovered_dir, fastq[uncovered_index].split("/")[-1]
-                )
+                    uncovered_dir, fastq[uncovered_index].split("/")[-1])
                 # print(destination_fastq)
-                logger.debug(
-                    "Moving FAULTY Fastq {} TO {}".format(
-                        fastq[uncovered_index], destination_fastq
-                    )
-                )
+                logger.debug("Moving FAULTY Fastq {} TO {}".format(
+                    fastq[uncovered_index], destination_fastq))
                 # print(fastq[uncovered_index])
                 shutil.move(fastq[uncovered_index], destination_fastq)
             except:
@@ -392,11 +388,8 @@ def remove_low_quality(
                         uncovered_dir_variants, uncovered)
                     # print(destination_file)
                     if not os.path.exists(destination_file):
-                        logger.debug(
-                            "Moving FAULTY folder {} TO {}".format(
-                                filename, destination_file
-                            )
-                        )
+                        logger.debug("Moving FAULTY folder {} TO {}".format(
+                            filename, destination_file))
                         shutil.move(filename, destination_file)
                     else:
                         logger.debug(
@@ -411,11 +404,13 @@ def remove_low_quality(
                 for name in files:
                     filename = os.path.join(outdir, name)
                     # print(filename)
-                    sample = re.search(r"^(.+?)[._-]", name).group(1)
+                    sample = filename.split("/")[-1].split(".")[0]
                     # print(sample)
                     if sample in uncovered_samples:
                         destination_file = os.path.join(uncovdir, name)
                         # print(destination_file)
+                        logger.debug("Moving FAULTY file {} TO {}".format(
+                            filename, destination_file))
                         shutil.move(filename, destination_file)
 
     return uncovered_samples
@@ -549,7 +544,7 @@ def create_coverage(input_bam, output_file):
 def calculate_cov_stats(file_cov):
     sample = file_cov.split("/")[-1].split(".")[0]
     df = pd.read_csv(file_cov, sep="\t", names=["#CHROM", "POS", "COV"])
-    unmmaped_pos = len(df.POS[df.COV == 0].tolist())
+    unmapped_pos = len(df.POS[df.COV == 0].tolist())
     pos_0_10 = len(df.POS[(df.COV > 0) & (df.COV <= 10)].tolist())
     pos_10_20 = len(df.POS[(df.COV > 10) & (df.COV <= 20)].tolist())
     pos_high20 = len(df.POS[(df.COV > 20)].tolist())
@@ -558,7 +553,7 @@ def calculate_cov_stats(file_cov):
     pos_high500 = len(df.POS[(df.COV >= 500)].tolist())
     pos_high1000 = len(df.POS[(df.COV >= 1000)].tolist())
     total_pos = df.shape[0]
-    unmmaped_prop = "%.2f" % ((unmmaped_pos / total_pos) * 100)
+    unmapped_prop = "%.2f" % ((unmapped_pos / total_pos) * 100)
     prop_0_10 = "%.2f" % ((pos_0_10 / total_pos) * 100)
     prop_10_20 = "%.2f" % ((pos_10_20 / total_pos) * 100)
     prop_high20 = "%.2f" % ((pos_high20 / total_pos) * 100)
@@ -572,7 +567,7 @@ def calculate_cov_stats(file_cov):
     return (
         sample,
         mean_cov,
-        unmmaped_prop,
+        unmapped_prop,
         prop_0_10,
         prop_10_20,
         prop_high20,
@@ -598,13 +593,13 @@ def obtain_group_cov_stats(directory, group_name):
         samples_to_skip = df_stat["#SAMPLE"].tolist()
         logger.debug(
             "Skipped samples for coverage calculation:" +
-            (",").join(samples_to_skip)
+            (",").join(str(samples_to_skip))
         )
 
     columns = [
         "#SAMPLE",
         "MEAN_COV",
-        "UNMMAPED_PROP",
+        "UNMAPPED_PROP",
         "COV1-10X",
         "COV10-20X",
         "COV>20X",
@@ -656,12 +651,12 @@ def extract_snp_count(out_variant_dir, filename_out):
         htz_snps = df["POS"][
             (df.ALT_DP >= 20)
             & (df.ALT_FREQ < 0.7)
-            & (df.ALT_FREQ >= 0.2)
+            & (df.ALT_FREQ >= 0.4)
             & (df.TYPE == "snp")
         ].tolist()
         indels = df["POS"][
             (df.ALT_DP >= 20)
-            & (df.ALT_FREQ >= 0.7)
+            & (df.ALT_FREQ >= 0.6)
             & ((df.TYPE == "ins") | (df.TYPE == "del"))
         ].tolist()
         return (len(high_quality_snps), len(htz_snps), len(indels))
@@ -763,7 +758,7 @@ def obtain_overal_stats(out_stats_dir, output_dir, group):
     columns = [
         "#SAMPLE",
         "MEAN_COV",
-        "UNMMAPED_PROP",
+        "UNMAPPED_PROP",
         "COV1-10X",
         "COV10-20X",
         "COV>20X",
@@ -779,7 +774,7 @@ def obtain_overal_stats(out_stats_dir, output_dir, group):
         samples_to_skip = df_stat["#SAMPLE"].tolist()
         logger.debug(
             "Skipped samples for coverage calculation:" +
-            (",").join(samples_to_skip)
+            (",").join(str(samples_to_skip))
         )
 
     for root, _, files in os.walk(out_stats_dir):
@@ -831,7 +826,7 @@ def obtain_overal_stats(out_stats_dir, output_dir, group):
                 for col in df.columns
                 if col != "#SAMPLE"
                 and col != "MEAN_COV"
-                and col != "UNMMAPED_PROP"
+                and col != "UNMAPPED_PROP"
                 and col != "COV1-10X"
                 and col != "COV10-20X"
                 and col != "COV>20X"
@@ -850,7 +845,7 @@ def obtain_overal_stats(out_stats_dir, output_dir, group):
                 for col in df.columns
                 if col != "#SAMPLE"
                 and col != "MEAN_COV"
-                and col != "UNMMAPED_PROP"
+                and col != "UNMAPPED_PROP"
                 and col != "COV1-10X"
                 and col != "COV10-20X"
                 and col != "COV>20X"
@@ -966,8 +961,8 @@ def ivar_consensus(
     out_consensus_dir,
     filename_out,
     min_quality=15,
-    min_frequency_threshold=0.7,
-    min_depth=8,
+    min_frequency_threshold=0.6,
+    min_depth=5,
     uncovered_character="N",
 ):
     """
