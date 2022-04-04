@@ -950,9 +950,9 @@ if __name__ == "__main__":
                         filename_bam_out,
                         out_consensus_dir,
                         filename_out,
-                        min_quality=args.min_quality,
-                        min_frequency_threshold=args.min_frequency,
-                        min_depth=8,
+                        min_quality=15,
+                        min_frequency_threshold=0.6,
+                        min_depth=5,
                         uncovered_character="N",
                     )
                     replace_consensus_header(out_consensus_file)
@@ -1075,7 +1075,7 @@ if __name__ == "__main__":
 
     if len(uncovered_samples) > 1:
         logger.info(
-            GREEN
+            RED
             + "Uncovered samples: "
             + (",").join(uncovered_samples)
             + END_FORMATTING
