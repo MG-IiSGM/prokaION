@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from cmd import Cmd
 import os
 import sys
 import re
@@ -81,29 +82,13 @@ def execute_subprocess(cmd, isShell=False, isInfo=False):
 
     try:
         command = subprocess.run(
-            cmd, shell=isShell, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
+            cmd, shell=isShell, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if command.returncode == 0:
             logger.debug(
-                GREEN + DIM + "Program %s successfully executed" % prog + END_FORMATTING
-            )
+                GREEN + DIM + "Program %s successfully executed" % prog + END_FORMATTING)
         else:
-            logger.info(
-                RED
-                + BOLD
-                + "Command %s FAILED\n" % prog
-                + END_FORMATTING
-                + BOLD
-                + "with parameters: "
-                + END_FORMATTING
-                + " ".join(param)
-                + "\n"
-                + BOLD
-                + "EXIT-CODE: %d\n" % command.returncode
-                + "ERROR:\n"
-                + END_FORMATTING
-                + command.stderr.decode().strip()
-            )
+            logger.info(RED + BOLD + "Command %s FAILED\n" % prog + END_FORMATTING + BOLD + "with parameters: " + END_FORMATTING + " ".join(
+                param) + "\n" + BOLD + "EXIT-CODE: %d\n" % command.returncode + "ERROR:\n" + END_FORMATTING + command.stderr.decode().strip())
 
         if isInfo:
             logger.info(command.stdout.decode().strip())
@@ -113,12 +98,8 @@ def execute_subprocess(cmd, isShell=False, isInfo=False):
         logger.debug(command.stderr.decode().strip())
 
     except OSError as e:
-        sys.exit(
-            RED
-            + BOLD
-            + "Failed to execute program '%s': %s" % (prog, str(e))
-            + END_FORMATTING
-        )
+        sys.exit(RED + BOLD + "Failed to execute program '%s': %s" % (prog,
+                 str(e)) + END_FORMATTING)
 
 
 ### Manipulation of files and paths ###
@@ -143,9 +124,8 @@ def check_file_exists(file_name):
     file_info = os.stat(file_name)
 
     if not os.path.isfile(file_name) or file_info.st_size == 0:
-        logger.info(
-            RED + BOLD + "File: %s not found or empty\n" % file_name + END_FORMATTING
-        )
+        logger.info(RED + BOLD + "File: %s not found or empty\n" %
+                    file_name + END_FORMATTING)
         sys.exit(1)
     return os.path.isfile(file_name)
 
@@ -207,19 +187,11 @@ def check_reanalysis(output_dir, samples_to_analyze):
 
         if len(samples_to_analyze) == len(previous_samples_list):
             logger.info(
-                MAGENTA
-                + "\nPrevious analysis detected, no new sequences added\n"
-                + END_FORMATTING
-            )
+                MAGENTA + "\nPrevious analysis detected, no new sequences added\n" + END_FORMATTING)
         else:
             new_samples = set(samples_to_analyze) - set(previous_samples_list)
-            logger.info(
-                MAGENTA
-                + "\nPrevious analysis detected, "
-                + str(len(new_samples))
-                + " new sequences added\n"
-                + END_FORMATTING
-            )
+            logger.info(MAGENTA + "\nPrevious analysis detected, " +
+                        str(len(new_samples)) + " new sequences added\n" + END_FORMATTING)
 
     return list(new_samples)
 
@@ -236,13 +208,7 @@ def file_to_list(file_name):
     return list_F
 
 
-def remove_low_quality(
-    input_dir,
-    output_dir,
-    min_coverage=30,
-    min_hq_snp=8,
-    type_remove="Uncovered",
-):
+def remove_low_quality(input_dir, output_dir, min_coverage=30, min_hq_snp=8, type_remove="Uncovered"):
 
     right_now = str(datetime.datetime.now())
     right_now_full = "_".join(right_now.split(" "))
@@ -254,13 +220,8 @@ def remove_low_quality(
     out_stats_bamstats_dir = os.path.join(out_stats_dir, "Bamstats")
     out_stats_coverage_dir = os.path.join(out_stats_dir, "Coverage")
 
-    folder_list = [
-        out_bam_dir,
-        out_consensus_dir,
-        out_stats_dir,
-        out_stats_bamstats_dir,
-        out_stats_coverage_dir,
-    ]
+    folder_list = [out_bam_dir, out_consensus_dir, out_stats_dir,
+                   out_stats_bamstats_dir, out_stats_coverage_dir]
 
     uncovered_dir = os.path.join(output_dir, type_remove)  # Uncovered or Mixed
     uncovered_dir_variants = os.path.join(uncovered_dir, "Variants")
@@ -270,14 +231,8 @@ def remove_low_quality(
     uncovered_stats_bam_dir = os.path.join(uncovered_stats_dir, "Bamstats")
     uncovered_stats_cov_dir = os.path.join(uncovered_stats_dir, "Coverage")
 
-    uncovered_folder_list = [
-        uncovered_dir,
-        uncovered_bam_dir,
-        uncovered_consensus_dir,
-        uncovered_stats_dir,
-        uncovered_stats_bam_dir,
-        uncovered_stats_cov_dir,
-    ]
+    uncovered_folder_list = [uncovered_dir, uncovered_bam_dir, uncovered_consensus_dir,
+                             uncovered_stats_dir, uncovered_stats_bam_dir, uncovered_stats_cov_dir]
     [check_create_dir(x) for x in uncovered_folder_list]
 
     uncovered_samples = []
@@ -298,21 +253,15 @@ def remove_low_quality(
                     stats_df["HQ_SNP"] = stats_df["HQ_SNP"].astype(str)
 
                     def f(x):
-                        return (
-                            x
-                            if x.replace(".", "", 1).isdigit()
-                            else max(x.strip("()").split(","))
-                        )
+                        return (x if x.replace(".", "", 1).isdigit() else max(x.strip("()").split(",")))
 
                     stats_df["HQ_SNP"] = stats_df.apply(
                         lambda x: f(x.HQ_SNP), axis=1)
                     stats_df["HQ_SNP"] = stats_df["HQ_SNP"].astype(float)
 
                     # Store samples under any of the parameters indicated
-                    uncovered_samples = stats_df["#SAMPLE"][
-                        (stats_df["UNMAPPED_PROP"] >= min_coverage)
-                        | (stats_df["HQ_SNP"] < min_hq_snp)
-                    ].tolist()
+                    uncovered_samples = stats_df["#SAMPLE"][(stats_df["UNMAPPED_PROP"] >= min_coverage) | (
+                        stats_df["HQ_SNP"] < min_hq_snp)].tolist()
                     # print(uncovered_samples)
 
                     # Create a df with only covered to replace the original
@@ -327,8 +276,7 @@ def remove_low_quality(
                         uncovered_samples)]
                     uncovered_table_filename = right_now_full + "_uncovered.summary.tab"
                     uncovered_table_file = os.path.join(
-                        uncovered_stats_dir, uncovered_table_filename
-                    )
+                        uncovered_stats_dir, uncovered_table_filename)
 
                     if len(uncovered_samples) > 0:
                         uncovered_df.to_csv(
@@ -430,18 +378,8 @@ def optimal_chunk_size(reference):
     chunks_size = "chunks_size"
     chunks_size_path = os.path.join(input_folder, "chunks_size")
 
-    cmd_infoseq = [
-        "infoseq",
-        "-auto",
-        "-only",
-        "-length",
-        "-noheading",
-        "-odirectory",
-        input_folder,
-        "-outfile",
-        chunks_size,
-        input_reference,
-    ]
+    cmd_infoseq = ["infoseq", "-auto", "-only", "-length", "-noheading",
+                   "-odirectory", input_folder, "-outfile", chunks_size, input_reference]
     # print(cmd_infoseq)
     execute_subprocess(cmd_infoseq, isShell=False)
 
@@ -475,8 +413,7 @@ def create_reference_chunks(reference):
     input_reference = os.path.abspath(reference)
     input_folder = os.path.dirname(reference)
     out_reference_file = os.path.join(
-        input_folder, "reference." + str(num_chunks) + ".regions"
-    )
+        input_folder, "reference." + str(num_chunks) + ".regions")
     fai_reference = input_reference + ".fai"
 
     if os.path.isfile(out_reference_file):
@@ -484,8 +421,7 @@ def create_reference_chunks(reference):
     else:
         logger.info(GREEN + "Creating " + out_reference_file + END_FORMATTING)
         cmd_chunks = "fasta_generate_regions.py {} {} > {}".format(
-            fai_reference, num_chunks, out_reference_file
-        )
+            fai_reference, num_chunks, out_reference_file)
         execute_subprocess(cmd_chunks, isShell=True)
 
     return out_reference_file
@@ -528,8 +464,7 @@ def merge_vcf(snp_vcf, indel_vcf):
 def create_bamstat(input_bam, output_file, threads=36):
 
     cmd_bamstat = "samtools flagstat --threads {} {} > {}".format(
-        str(threads), input_bam, output_file
-    )
+        str(threads), input_bam, output_file)
     # print(cmd_bamstat)
     execute_subprocess(cmd_bamstat, isShell=True)
 
@@ -564,18 +499,7 @@ def calculate_cov_stats(file_cov):
 
     mean_cov = "%.2f" % (df.COV.mean())
 
-    return (
-        sample,
-        mean_cov,
-        unmapped_prop,
-        prop_0_10,
-        prop_10_20,
-        prop_high20,
-        prop_high50,
-        prop_high100,
-        prop_high500,
-        prop_high1000,
-    )
+    return (sample, mean_cov, unmapped_prop, prop_0_10, prop_10_20, prop_high20, prop_high50, prop_high100, prop_high500, prop_high1000)
 
 
 def obtain_group_cov_stats(directory, group_name):
@@ -591,23 +515,11 @@ def obtain_group_cov_stats(directory, group_name):
         previous_stat = True
         df_stat = pd.read_csv(output_file, sep="\t")
         samples_to_skip = df_stat["#SAMPLE"].tolist()
-        logger.debug(
-            "Skipped samples for coverage calculation:" +
-            (",").join(str(samples_to_skip))
-        )
+        logger.debug("Skipped samples for coverage calculation:" +
+                     (",").join(str(samples_to_skip)))
 
-    columns = [
-        "#SAMPLE",
-        "MEAN_COV",
-        "UNMAPPED_PROP",
-        "COV1-10X",
-        "COV10-20X",
-        "COV>20X",
-        "COV>50X",
-        "COV>100X",
-        "COV>500X",
-        "COV>1000X",
-    ]
+    columns = ["#SAMPLE", "MEAN_COV", "UNMAPPED_PROP", "COV1-10X",
+               "COV10-20X", "COV>20X", "COV>50X", "COV>100X", "COV>500X", "COV>1000X"]
 
     files_list = []
 
@@ -645,20 +557,12 @@ def extract_snp_count(out_variant_dir, filename_out):
     if os.path.exists(filename):
         df = pd.read_csv(filename, sep="\t")
         df = df.drop_duplicates(subset=["POS", "REF", "ALT"], keep="first")
-        high_quality_snps = df["POS"][
-            (df.ALT_DP >= 20) & (df.ALT_FREQ >= 0.7) & (df.TYPE == "snp")
-        ].tolist()
-        htz_snps = df["POS"][
-            (df.ALT_DP >= 20)
-            & (df.ALT_FREQ < 0.7)
-            & (df.ALT_FREQ >= 0.4)
-            & (df.TYPE == "snp")
-        ].tolist()
-        indels = df["POS"][
-            (df.ALT_DP >= 20)
-            & (df.ALT_FREQ >= 0.6)
-            & ((df.TYPE == "ins") | (df.TYPE == "del"))
-        ].tolist()
+        high_quality_snps = df["POS"][(df.ALT_DP >= 20) & (
+            df.ALT_FREQ >= 0.7) & (df.TYPE == "snp")].tolist()
+        htz_snps = df["POS"][(df.ALT_DP >= 20) & (df.ALT_FREQ < 0.7) & (
+            df.ALT_FREQ >= 0.4) & (df.TYPE == "snp")].tolist()
+        indels = df["POS"][(df.ALT_DP >= 20) & (df.ALT_FREQ >= 0.6) & (
+            (df.TYPE == "ins") | (df.TYPE == "del"))].tolist()
         return (len(high_quality_snps), len(htz_snps), len(indels))
     else:
         logger.debug("FILE " + filename + " NOT FOUND")
@@ -726,15 +630,7 @@ def extract_n_consensus(out_consensus_dir, filename_out):
                 mean_length_N = mean(length_N)
                 sum_length_N = sum(length_N)
                 total_perc_N = sum_length_N / len(sequence) * 100
-                return (
-                    len(all_N),
-                    len(individual_N),
-                    len(leading_N),
-                    len(tailing_N),
-                    sum_length_N,
-                    total_perc_N,
-                    mean_length_N,
-                )
+                return (len(all_N), len(individual_N), len(leading_N), len(tailing_N), sum_length_N, total_perc_N, mean_length_N)
             else:
                 return (0, 0, 0, 0, 0, 0, 0)
 
@@ -755,27 +651,15 @@ def obtain_overal_stats(out_stats_dir, output_dir, group):
     out_stats_bamstats_dir = os.path.join(out_stats_dir, "Bamstats")
     out_consensus_dir = os.path.join(output_dir, "Consensus")
 
-    columns = [
-        "#SAMPLE",
-        "MEAN_COV",
-        "UNMAPPED_PROP",
-        "COV1-10X",
-        "COV10-20X",
-        "COV>20X",
-        "COV>50X",
-        "COV>100X",
-        "COV>500X",
-        "COV>1000X",
-    ]
+    columns = ["#SAMPLE", "MEAN_COV", "UNMAPPED_PROP", "COV1-10X",
+               "COV10-20X", "COV>20X", "COV>50X", "COV>100X", "COV>500X", "COV>1000X"]
 
     if os.path.exists(overal_stat_file):
         previous_stat = True
         df_stat = pd.read_csv(overal_stat_file, sep="\t")
         samples_to_skip = df_stat["#SAMPLE"].tolist()
-        logger.debug(
-            "Skipped samples for coverage calculation:" +
-            (",").join(str(samples_to_skip))
-        )
+        logger.debug("Skipped samples for coverage calculation:" +
+                     (",").join(str(samples_to_skip)))
 
     for root, _, files in os.walk(out_stats_dir):
         for name in files:
@@ -787,74 +671,21 @@ def obtain_overal_stats(out_stats_dir, output_dir, group):
                 df = df[~df["#SAMPLE"].isin(samples_to_skip)]
                 # print(df)
                 if df.shape[0] > 0:
-                    df[["HQ_SNP", "HTZ_SNP", "INDELS"]] = df.parallel_apply(
-                        lambda x: extract_snp_count(
-                            out_variant_dir, x["#SAMPLE"]),
-                        axis=1,
-                        result_type="expand",
-                    )
-                    df[["reads_mapped", "perc_mapped"]] = df.parallel_apply(
-                        lambda x: extract_mapped_reads(
-                            out_stats_bamstats_dir, x["#SAMPLE"]
-                        ),
-                        axis=1,
-                        result_type="expand",
-                    )
-                    df[
-                        [
-                            "N_groups",
-                            "N_individual",
-                            "N_leading",
-                            "N_tailing",
-                            "N_sum_len",
-                            "N_total_perc",
-                            "N_mean_len",
-                        ]
-                    ] = df.parallel_apply(
-                        lambda x: extract_n_consensus(
-                            out_consensus_dir, x["#SAMPLE"]),
-                        axis=1,
-                        result_type="expand",
-                    )
+                    df[["HQ_SNP", "HTZ_SNP", "INDELS"]] = df.parallel_apply(lambda x: extract_snp_count(
+                        out_variant_dir, x["#SAMPLE"]), axis=1, result_type="expand")
+                    df[["reads_mapped", "perc_mapped"]] = df.parallel_apply(lambda x: extract_mapped_reads(
+                        out_stats_bamstats_dir, x["#SAMPLE"]), axis=1, result_type="expand")
+                    df[["N_groups", "N_individual", "N_leading", "N_tailing", "N_sum_len", "N_total_perc", "N_mean_len"]] = df.parallel_apply(
+                        lambda x: extract_n_consensus(out_consensus_dir, x["#SAMPLE"]), axis=1, result_type="expand")
 
     if previous_stat:
         df = pd.concat([df_stat, df], ignore_index=True, sort=True)
-        df = df[
-            columns
-            + [
-                col
-                for col in df.columns
-                if col != "#SAMPLE"
-                and col != "MEAN_COV"
-                and col != "UNMAPPED_PROP"
-                and col != "COV1-10X"
-                and col != "COV10-20X"
-                and col != "COV>20X"
-                and col != "COV>50X"
-                and col != "COV>100X"
-                and col != "COV>500X"
-                and col != "COV>1000X"
-            ]
-        ]
+        df = df[columns + [col for col in df.columns if col != "#SAMPLE" and col != "MEAN_COV" and col != "UNMAPPED_PROP" and col !=
+                           "COV1-10X" and col != "COV10-20X" and col != "COV>20X" and col != "COV>50X" and col != "COV>100X" and col != "COV>500X" and col != "COV>1000X"]]
         df.to_csv(overal_stat_file, sep="\t", index=False)
     else:
-        df = df[
-            columns
-            + [
-                col
-                for col in df.columns
-                if col != "#SAMPLE"
-                and col != "MEAN_COV"
-                and col != "UNMAPPED_PROP"
-                and col != "COV1-10X"
-                and col != "COV10-20X"
-                and col != "COV>20X"
-                and col != "COV>50X"
-                and col != "COV>100X"
-                and col != "COV>500X"
-                and col != "COV>1000X"
-            ]
-        ]
+        df = df[columns + [col for col in df.columns if col != "#SAMPLE" and col != "MEAN_COV" and col != "UNMAPPED_PROP" and col !=
+                           "COV1-10X" and col != "COV10-20X" and col != "COV>20X" and col != "COV>50X" and col != "COV>100X" and col != "COV>500X" and col != "COV>1000X"]]
         df.to_csv(overal_stat_file, sep="\t", index=False)
 
 
@@ -888,14 +719,10 @@ def import_VCF42_freebayes_to_tsv(vcf_file, sep="\t"):
                     info = line_split[-1].split(";")
                     for field in extra_fields:
                         extra_field_list.append(
-                            [x.split("=")[-1] for x in info if field in x][0]
-                        )
+                            [x.split("=")[-1] for x in info if field in x][0])
                     if "OLDVAR" in line:
                         extra_field_list.append(
-                            [x.split("=")[-1] for x in info if "OLDVAR" in x][0].split(
-                                ","
-                            )[0]
-                        )
+                            [x.split("=")[-1] for x in info if "OLDVAR" in x][0].split(",")[0])
                     output_line = ("\t").join(
                         line_split[:7] + extra_field_list)
                     fout.write(output_line + "\n")
@@ -907,40 +734,15 @@ def import_tsv_freebayes_to_df(tsv_file, sep="\t"):
 
     df = pd.read_csv(tsv_file, sep=sep)
 
-    df.rename(
-        columns={
-            "#CHROM": "REGION",
-            "RO": "REF_DP",
-            "DP": "TOTAL_DP",
-            "AO": "ALT_DP",
-            "QUAL": "ALT_QUAL",
-        },
-        inplace=True,
-    )
+    df.rename(columns={"#CHROM": "REGION", "RO": "REF_DP",
+              "DP": "TOTAL_DP", "AO": "ALT_DP", "QUAL": "ALT_QUAL"}, inplace=True)
 
     df["REF_FREQ"] = df["REF_DP"] / df["TOTAL_DP"]
     df["ALT_FREQ"] = df["ALT_DP"] / df["TOTAL_DP"]
 
     df = df.sort_values(by=["POS"]).reset_index(drop=True)
 
-    return df[
-        [
-            "REGION",
-            "POS",
-            "ID",
-            "REF",
-            "ALT",
-            "ALT_QUAL",
-            "FILTER",
-            "TOTAL_DP",
-            "TYPE",
-            "REF_DP",
-            "ALT_DP",
-            "REF_FREQ",
-            "ALT_FREQ",
-            "OLDVAR",
-        ]
-    ]
+    return df[["REGION", "POS", "ID", "REF", "ALT", "ALT_QUAL", "FILTER", "TOTAL_DP", "TYPE", "REF_DP", "ALT_DP", "REF_FREQ", "ALT_FREQ", "OLDVAR"]]
 
 
 def vcf_to_ivar_tsv(input_vcf, output_tsv):
@@ -956,18 +758,11 @@ def vcf_to_ivar_tsv(input_vcf, output_tsv):
 ### Consensus ###
 
 
-def ivar_consensus(
-    filename_bam_out,
-    out_consensus_dir,
-    filename_out,
-    min_quality=15,
-    min_frequency_threshold=0.6,
-    min_depth=5,
-    uncovered_character="N",
-):
+def ivar_consensus(filename_bam_out, out_consensus_dir, filename_out, min_quality=5, min_frequency_threshold=0.6, min_depth=5, uncovered_character="N"):
+    # Find another solution, if we set q>7 an error occur "Segmentation fault", they are trying to fix it.
     """
     ivar consensus
-        Usage: samtools mpileup -aa -A -d 0 -Q 0 <input.bam> | ivar consensus -p <prefix> 
+        Usage: samtools mpileup -aa -A -R -d 0 -Q 0 <input.bam> | ivar consensus -p <prefix> 
         Note : samtools mpileup output must be piped into ivar consensus
         Input Options    Description
            -q    Minimum quality score threshold to count base (Default: 20)
@@ -983,20 +778,14 @@ def ivar_consensus(
            -k    If '-k' flag is added, regions with depth less than minimum depth will not be added to the consensus sequence. Using '-k' will override any option specified using -n 
            -n    (N/-) Character to print in regions with less than minimum coverage(Default: N)
         Output Options   Description
+           -R    Ignore RG tags. Treat all reads in one BAM as one sample.
            -p    (Required) Prefix for the output fasta file and quality file
     """
 
     prefix = os.path.join(out_consensus_dir, filename_out)
 
-    cmd_consensus = "samtools mpileup -aa -A -d 0 -B -Q 0 {} | \
-        ivar consensus -p {} -q {} -t {} -m {} -n {}".format(
-        filename_bam_out,
-        prefix,
-        min_quality,
-        min_frequency_threshold,
-        min_depth,
-        uncovered_character,
-    )
+    cmd_consensus = "samtools mpileup -aa -A -R -d 0 -B -Q 0 {} | ivar consensus -p {} -q {} -t {} -m {} -n {}".format(
+        filename_bam_out, prefix, min_quality, min_frequency_threshold, min_depth, uncovered_character)
     # print(cmd_consensus)
     execute_subprocess(cmd_consensus, isShell=True)
 
@@ -1040,13 +829,8 @@ def snpeff_execution(vcf_file, annot_file, database=False):
         cmd_snpeff = ["snpEff", "-noStats", database, vcf_file]
         with open(annot_file, "w+") as outfile:
             # Calculate coverage and save it in the output file
-            subprocess.run(
-                cmd_snpeff,
-                stdout=outfile,
-                stderr=subprocess.PIPE,
-                check=True,
-                universal_newlines=True,
-            )
+            subprocess.run(cmd_snpeff, stdout=outfile,
+                           stderr=subprocess.PIPE, check=True, universal_newlines=True)
     else:
         with open(annot_file, "w+") as outfile:
             outfile.write("No annotation found")
@@ -1080,31 +864,15 @@ def import_annot_to_pandas(vcf_file, sep="\t"):
     df = pd.read_csv(vcf_file, sep=sep, skiprows=[
                      header_lines], header=header_lines)
 
-    ann_headers = [
-        "Allele",
-        "Annotation",
-        "Annotation_Impact",
-        "Gene_Name",
-        "Gene_ID",
-        "Feature_Type",
-        "Feature_ID",
-        "Transcript_BioType",
-        "Rank",
-        "HGVS.c",
-        "HGVS.p",
-        "cDNA.pos / cDNA.length",
-        "CDS.pos / CDS.length",
-        "AA.pos / AA.length",
-        "ERRORS / WARNINGS / INFO",
-    ]
+    ann_headers = ["Allele", "Annotation", "Annotation_Impact", "Gene_Name", "Gene_ID", "Feature_Type", "Feature_ID", "Transcript_BioType",
+                   "Rank", "HGVS.c", "HGVS.p", "cDNA.pos / cDNA.length", "CDS.pos / CDS.length", "AA.pos / AA.length", "ERRORS / WARNINGS / INFO"]
 
     anlelle_headers = ["Codon_change", "AA_change", "DP", "ALT_FREQ"]
 
     # Apply function to split and recover the first 15 fields = only first anotations, the most likely
 
-    df[anlelle_headers] = df.apply(
-        lambda x: x.INFO.split(";")[0:4], axis=1, result_type="expand"
-    )
+    df[anlelle_headers] = df.apply(lambda x: x.INFO.split(";")[
+                                   0:4], axis=1, result_type="expand")
 
     for head in anlelle_headers:
         df[head] = df[head].str.split("=").str[-1]
@@ -1114,14 +882,8 @@ def import_annot_to_pandas(vcf_file, sep="\t"):
 
     df.INFO = df.INFO.str.split("ANN=").str[-1]
 
-    df = df.join(
-        df.pop("INFO")
-        .str.strip(",")
-        .str.split(",", expand=True)
-        .stack()
-        .reset_index(level=1, drop=True)
-        .rename("INFO")
-    ).reset_index(drop=True)
+    df = df.join(df.pop("INFO").str.strip(",").str.split(",", expand=True).stack(
+    ).reset_index(level=1, drop=True).rename("INFO")).reset_index(drop=True)
 
     df["TMP_ANN_16"] = df["INFO"].apply(
         lambda x: ("|").join(x.split("|")[0:15]))
@@ -1136,9 +898,7 @@ def import_annot_to_pandas(vcf_file, sep="\t"):
     return df
 
 
-def annotate_snpeff(
-    input_vcf_file, output_annot_file, database="Mycobacterium_tuberculosis_h37rv"
-):
+def annotate_snpeff(input_vcf_file, output_annot_file, database="Mycobacterium_tuberculosis_h37rv"):
 
     # Execute snpEff
     snpeff_execution(input_vcf_file, output_annot_file, database=database)
@@ -1176,9 +936,8 @@ def bed_to_df(bed_file):
         # Delim_whitespace=True
         df = pd.read_csv(bed_file, sep="\t", header=None)
     else:
-        df = pd.read_csv(
-            bed_file, sep="\t", skiprows=header_lines, header=None
-        )  # Delim_whitespace=True
+        df = pd.read_csv(bed_file, sep="\t", skiprows=header_lines,
+                         header=None)  # Delim_whitespace=True
 
     df = df.iloc[:, 0:4]
     df.columns = ["#CHROM", "start", "end", "description"]
@@ -1193,15 +952,9 @@ def add_bed_info(bed_df, position):
     """
 
     # dict_position = bed_to_dict(bed_file)
-    if any(
-        start <= position <= end
-        for (start, end) in zip(
-            bed_df.start.values.tolist(), bed_df.end.values.tolist()
-        )
-    ):
-        description_out = bed_df.description[
-            (bed_df.start <= position) & (bed_df.end >= position)
-        ].values[0]
+    if any(start <= position <= end for (start, end) in zip(bed_df.start.values.tolist(), bed_df.end.values.tolist())):
+        description_out = bed_df.description[(
+            bed_df.start <= position) & (bed_df.end >= position)].values[0]
         return description_out
     else:
         return None
@@ -1221,8 +974,7 @@ def annotate_bed(tsv_df, bed_files):
                 logger.info("Annotating BED: {}".format(bed_file))
                 bed_annot_df = bed_to_df(bed_file)
                 df[variable_name] = df["POS"].apply(
-                    lambda x: add_bed_info(bed_annot_df, x)
-                )
+                    lambda x: add_bed_info(bed_annot_df, x))
 
             return df
 
@@ -1240,9 +992,8 @@ def import_VCF_to_pandas(vcf_file):
             next_line = f.readline()
 
     if first_line.startswith("##"):
-        df = pd.read_csv(
-            vcf_file, sep="\t", skiprows=[header_lines], header=header_lines
-        )
+        df = pd.read_csv(vcf_file, sep="\t", skiprows=[
+                         header_lines], header=header_lines)
 
         df["ALT"] = df["ALT"].str.upper()
         df["REF"] = df["REF"].str.upper()
@@ -1324,16 +1075,7 @@ def user_annotation_aa(annot_file, output_file, aa_files=[]):
             df.to_csv(output_file, sep="\t", index=False)
 
 
-def make_blast(
-    query_fasta,
-    database,
-    sample,
-    output_folder,
-    db_type="nucl",
-    query_type="nucl",
-    evalue=0.0001,
-    threads=36,
-):
+def make_blast(query_fasta, database, sample, output_folder, db_type="nucl", query_type="nucl", evalue=0.0001, threads=36):
 
     blast_command = "blastn" if query_type == "nucl" else "blastp"
     database_name = database.split("/")[-1].split(".")[0]
@@ -1341,36 +1083,52 @@ def make_blast(
         output_folder, database_name + ".blast.tmp")
     output_blast = os.path.join(
         output_folder, sample + "." + database_name + ".blast")
-    blastdb_cmd = [
-        "makeblastdb",
-        "-in",
-        database,
-        "-out",
-        output_database_tmp,
-        "-dbtype",
-        db_type,
-    ]
+    blastdb_cmd = ["makeblastdb", "-in", database,
+                   "-out", output_database_tmp, "-dbtype", db_type]
 
     logger.info((",").join(blastdb_cmd))
 
     execute_subprocess(blastdb_cmd)
 
-    blast_cmd = [
-        blast_command,
-        "-query",
-        query_fasta,
-        "-db",
-        output_database_tmp,
-        "-out",
-        output_blast,
-        "-evalue",
-        str(evalue),
-        "-num_threads",
-        str(threads),
-        "-outfmt",
-        "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen",
-    ]
+    blast_cmd = [blast_command, "-query", query_fasta, "-db", output_database_tmp, "-out", output_blast, "-evalue", str(evalue), "-num_threads", str(
+        threads), "-outfmt", "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen"]
 
     logger.info((",").join(blast_cmd))
 
     execute_subprocess(blast_cmd)
+
+
+def kraken(sample, report, kraken2_db, krona_html, threads=34):
+
+    cmd_kraken = "kraken2 --db {} --use-names --threads {} --report {} --gzip-compressed {}".format(
+        kraken2_db, str(threads), report, sample)
+
+    # print(cmd_kraken)
+    execute_subprocess(cmd_kraken, isShell=True)
+
+    cmd_krona = "ImportTaxonomy.pl -m 3 -q 2 -t 5 {} -o {}".format(
+        report, krona_html)
+
+    # print(cmd_krona)
+    execute_subprocess(cmd_krona, isShell=True)
+
+
+def mash_screen(sample, out_dir, mash_database, winner=True, threads=16):
+    """
+    https://mash.readthedocs.io/en/latest/index.html
+    https://gembox.cbcb.umd.edu/mash/refseq.genomes.k21s1000.msh #MASH refseq database
+    wget https://gembox.cbcb.umd.edu/mash/refseq.genomes.k21s1000.msh
+    mash screen -w -p 4 ../refseq.genomes.k21s1000.msh 4_R1.fastq.gz 4_R2.fastq.gz > 4.winner.screen.tab
+    identity, shared-hashes, median-multiplicity, p-value, query-ID, query-comment
+    """
+
+    if not os.path.isfile(mash_database):
+        logger.info(RED + BOLD + "Mash database can't be found\n" + END_FORMATTING + "You can download it typing:\n\
+            wget https://gembox.cbcb.umd.edu/mash/refseq.genomes.k21s1000.msh")
+        sys.exit(1)
+
+    cmd_mash = "mash screen -w -p {} {} {} > {}".format(
+        threads, mash_database, sample, out_dir)
+
+    # print(cmd_mash)
+    execute_subprocess(cmd_mash, isShell=True)

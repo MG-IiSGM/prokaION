@@ -9,6 +9,7 @@ import subprocess
 import datetime
 import gzip
 import multiprocessing
+import pandas as pd
 
 
 # Local application imports
@@ -37,8 +38,9 @@ from misc_prokaion import (
     annotate_snpeff,
     user_annotation,
     user_annotation_aa,
-    make_blast
-)
+    make_blast,
+    kraken,
+    mash_screen)
 
 from compare_snp_prokaion import (
     ddbb_create_intermediate,
@@ -85,311 +87,126 @@ DIM = "\033[2m"
 def get_arguments():
 
     parser = argparse.ArgumentParser(
-        prog="varcal_minion.py",
-        description="Pipeline to Variant Calling from MinION sequencing. Specialized in prokaryotes",
-    )
+        prog="varcal_minion.py", description="Pipeline to Variant Calling from MinION sequencing. Specialized in prokaryotes")
 
     input_group = parser.add_argument_group("Input", "Input parameters")
 
-    input_group.add_argument(
-        "-i",
-        "--input",
-        dest="input_dir",
-        metavar="Input_directory",
-        type=str,
-        required=True,
-        help="REQUIRED. Input directory containing all fastq files",
-    )
+    input_group.add_argument("-i", "--input", dest="input_dir", metavar="Input_directory",
+                             type=str, required=True, help="REQUIRED. Input directory containing all fastq files")
 
-    input_group.add_argument(
-        "-s",
-        "--sample",
-        metavar="sample",
-        type=str,
-        required=False,
-        help="Sample to identify further files",
-    )
+    input_group.add_argument("-s", "--sample", metavar="sample", type=str,
+                             required=False, help="Sample to identify further files")
 
-    input_group.add_argument(
-        "-L",
-        "--sample_list",
-        type=str,
-        required=False,
-        help="Sample names to analyse only in the file supplied",
-    )
+    input_group.add_argument("-L", "--sample_list", type=str, required=False,
+                             help="Sample names to analyse only in the file supplied")
 
-    input_group.add_argument(
-        "-p",
-        "--primers",
-        type=str,
-        required=False,
-        help="Bed file including primers to trim",
-    )
+    input_group.add_argument("-p", "--primers", type=str,
+                             required=False, help="Bed file including primers to trim")
 
-    input_group.add_argument(
-        "-t",
-        "--threads",
-        type=int,
-        dest="threads",
-        required=False,
-        default=36,
-        help="Threads to use (36 threads by default)",
-    )
+    input_group.add_argument("-t", "--threads", type=int, dest="threads",
+                             required=False, default=36, help="Threads to use (36 threads by default)")
 
     variant_group = parser.add_argument_group(
-        "Variant Calling", "Variant Calling parameters"
-    )
+        "Variant Calling", "Variant Calling parameters")
 
-    variant_group.add_argument(
-        "-bayes",
-        "--bayes",
-        required=False,
-        action="store_true",
-        help="Variant Calling is done with freebayes-parallel",
-    )
+    variant_group.add_argument("-bayes", "--bayes", required=False, action="store_true",
+                               help="Variant Calling is done with freebayes-parallel")
 
-    variant_group.add_argument(
-        "-f",
-        "--min_allele_frequency",
-        type=int,
-        dest="min_allele_frequency",
-        required=False,
-        default=0.1,
-        help="Minimum fraction of observations supporting an alternate allele. Default: 0.1",
-    )
+    variant_group.add_argument("-f", "--min_allele_frequency", type=int, dest="min_allele_frequency", required=False,
+                               default=0.2, help="Minimum fraction of observations supporting an alternate allele. Default: 0.2")
 
-    variant_group.add_argument(
-        "-q",
-        "--min_base_quality",
-        type=int,
-        dest="min_quality",
-        required=False,
-        default=10,
-        help="Exclude alleles from analysis below threshold. Default: 10",
-    )
+    variant_group.add_argument("-q", "--min_base_quality", type=int, dest="min_quality", required=False,
+                               default=10, help="Exclude alleles from analysis below threshold. Default: 10")
 
-    variant_group.add_argument(
-        "-m",
-        "--min_mapping_quality",
-        type=int,
-        dest="min_mapping",
-        required=False,
-        default=60,
-        help="Exclude alignments from analysis below threshold. Default: 60",
-    )
+    variant_group.add_argument("-m", "--min_mapping_quality", type=int, dest="min_mapping", required=False,
+                               default=60, help="Exclude alignments from analysis below threshold. Default: 60")
 
-    variant_group.add_argument(
-        "-freq",
-        "--min_frequency",
-        type=int,
-        dest="min_frequency",
-        required=False,
-        default=0.7,
-        help="Minimum fraction of observations to call a base. Default: 0.7",
-    )
+    variant_group.add_argument("-freq", "--min_frequency", type=int, dest="min_frequency", required=False,
+                               default=0.7, help="Minimum fraction of observations to call a base. Default: 0.7")
 
-    variant_group.add_argument(
-        "-d",
-        "--min_depth",
-        type=int,
-        dest="min_depth",
-        required=False,
-        default=8,
-        help="Minimum depth to call a base. Default: 8",
-    )
+    variant_group.add_argument("-d", "--min_depth", type=int, dest="min_depth",
+                               required=False, default=8, help="Minimum depth to call a base. Default: 8")
 
     reference_group = parser.add_argument_group(
         "Reference", "Reference parameters")
 
-    reference_group.add_argument(
-        "-r",
-        "--reference",
-        metavar="Reference",
-        type=str,
-        required=True,
-        help="REQUIRED. File to map against",
-    )
+    reference_group.add_argument("-r", "--reference", metavar="Reference",
+                                 type=str, required=True, help="REQUIRED. File to map against")
 
-    reference_group.add_argument(
-        "--ploidy",
-        type=int,
-        dest="ploidy",
-        required=False,
-        default=1,
-        help="Sets the default ploidy for the analysis",
-    )
+    reference_group.add_argument("--ploidy", type=int, dest="ploidy", required=False,
+                                 default=1, help="Sets the default ploidy for the analysis")
+
+    species_group = parser.add_argument_group(
+        "Species determination", "Species databases")
+
+    species_group.add_argument("--kraken2", dest="kraken2_db", type=str, default=False,
+                               required=False, help="REQUIRED. Kraken2 database")
+
+    species_group.add_argument("--mash_db", dest="mash_db", type=str, required=False, default=False,
+                               help="REQUIRED. MASH NCBI annotation containing bacterial database")
 
     quality_group = parser.add_argument_group(
-        "Quality parameters", "Parameters for diferent Quality conditions"
-    )
+        "Quality parameters", "Parameters for diferent Quality conditions")
 
-    quality_group.add_argument(
-        "-c",
-        "--coverage20",
-        type=int,
-        default=50,
-        required=False,
-        help="Minimum percentage of coverage at 20X to clasify as uncovered. Default: 50",
-    )
+    quality_group.add_argument("-c", "--coverage20", type=int, default=50, required=False,
+                               help="Minimum percentage of coverage at 20X to clasify as uncovered. Default: 50")
 
-    quality_group.add_argument(
-        "-n",
-        "--min_snp",
-        type=int,
-        required=False,
-        default=30,
-        help="SNP number to pass quality threshold. Default: 30 HQ SNP",
-    )
+    quality_group.add_argument("-n", "--min_snp", type=int, required=False,
+                               default=75, help="SNP number to pass quality threshold. Default: 30 HQ SNP")
 
     annotation_group = parser.add_argument_group(
-        "Annotation", "Parameters for Variant Annotation"
-    )
+        "Annotation", "Parameters for Variant Annotation")
 
-    annotation_group.add_argument(
-        "-B",
-        "--annot_bed",
-        type=str,
-        default=[],
-        required=False,
-        action="append",
-        help="BED file to annotate",
-    )
+    annotation_group.add_argument("-B", "--annot_bed", type=str, default=[],
+                                  required=False, action="append", help="BED file to annotate")
 
-    annotation_group.add_argument(
-        "-V",
-        "--annot_vcf",
-        type=str,
-        default=[],
-        required=False,
-        action="append",
-        help="VCF file to annotate",
-    )
+    annotation_group.add_argument("-V", "--annot_vcf", type=str, default=[],
+                                  required=False, action="append", help="VCF file to annotate")
 
-    annotation_group.add_argument(
-        "-F",
-        "--annot_fasta",
-        type=str,
-        default=[],
-        required=False,
-        action="append",
-        help="FASTA file to annotate",
-    )
+    annotation_group.add_argument("-F", "--annot_fasta", type=str, default=[],
+                                  required=False, action="append", help="FASTA file to annotate")
 
-    annotation_group.add_argument(
-        "-A",
-        "--annot_aa",
-        type=str,
-        default=[],
-        required=False,
-        action="append",
-        help="Aminoacid file to annotate",
-    )
+    annotation_group.add_argument("-A", "--annot_aa", type=str, default=[],
+                                  required=False, action="append", help="Aminoacid file to annotate")
 
-    annotation_group.add_argument(
-        "-R",
-        "--remove_bed",
-        type=str,
-        default=False,
-        required=False,
-        help="BED file with positions to remove",
-    )
+    annotation_group.add_argument("-R", "--remove_bed", type=str, default=False,
+                                  required=False, help="BED file with positions to remove")
 
-    annotation_group.add_argument(
-        "--mash_database",
-        type=str,
-        required=False,
-        default=False,
-        help="MASH NCBI annotation containing species database",
-    )
-
-    annotation_group.add_argument(
-        "--snpeff_database",
-        type=str,
-        required=False,
-        default=False,
-        help="SnpEFF annotation database",
-    )
+    annotation_group.add_argument("--snpeff_database", type=str,
+                                  required=False, default=False, help="SnpEFF annotation database")
 
     compare_group = parser.add_argument_group(
-        "Compare", "Parameters for comparison between VCFs"
-    )
+        "Compare", "Parameters for comparison between VCFs")
 
-    compare_group.add_argument(
-        "-S",
-        "--only_snp",
-        required=False,
-        action="store_true",
-        help="Use INDELs while comparing",
-    )
+    compare_group.add_argument("-S", "--only_snp", required=False,
+                               action="store_true", help="Use INDELs while comparing")
 
-    compare_group.add_argument(
-        "-w",
-        "--window",
-        required=False,
-        type=int,
-        default=2,
-        help="Number of SNPs in 10bp to discard. Default: 2",
-    )
+    compare_group.add_argument("-w", "--window", required=False, type=int,
+                               default=2, help="Number of SNPs in 10bp to discard. Default: 2")
 
-    compare_group.add_argument(
-        "--min_threshold_discard_uncov_sample",
-        required=False,
-        type=float,
-        default=0.6,
-        help="Minimum uncovered genome to discard a sample. Default: 0.6",
-    )
+    compare_group.add_argument("--min_threshold_discard_uncov_sample", required=False, type=float,
+                               default=0.6, help="Minimum uncovered genome to discard a sample. Default: 0.6")
 
-    compare_group.add_argument(
-        "--min_threshold_discard_uncov_pos",
-        required=False,
-        type=float,
-        default=0.5,
-        help="Minimum covered position to discard it. Default: 0.6",
-    )
+    compare_group.add_argument("--min_threshold_discard_uncov_pos", required=False,
+                               type=float, default=0.5, help="Minimum covered position to discard it. Default: 0.6")
 
-    compare_group.add_argument(
-        "--min_threshold_discard_htz_sample",
-        required=False,
-        type=float,
-        default=0.6,
-        help="Minimum heterozygosity to discard a sample. Default: 0.6",
-    )
+    compare_group.add_argument("--min_threshold_discard_htz_sample", required=False, type=float,
+                               default=0.6, help="Minimum heterozygosity to discard a sample. Default: 0.6")
 
-    compare_group.add_argument(
-        "--min_threshold_discard_htz_pos",
-        required=False,
-        type=float,
-        default=0.5,
-        help="Minimum heterozygosity to discard a position. Default: 0.6",
-    )
+    compare_group.add_argument("--min_threshold_discard_htz_pos", required=False, type=float,
+                               default=0.5, help="Minimum heterozygosity to discard a position. Default: 0.6")
 
-    compare_group.add_argument(
-        "--min_threshold_discard_all_sample",
-        required=False,
-        type=float,
-        default=0.6,
-        help="Minimum inaccuracies to discard a sample. Default: 0.6",
-    )
+    compare_group.add_argument("--min_threshold_discard_all_sample", required=False, type=float,
+                               default=0.6, help="Minimum inaccuracies to discard a sample. Default: 0.6")
 
-    compare_group.add_argument(
-        "--min_threshold_discard_all_pos",
-        required=False,
-        type=float,
-        default=0.5,
-        help="Minimum inaccuracies to discard a position. Default: 0.6",
-    )
+    compare_group.add_argument("--min_threshold_discard_all_pos", required=False, type=float,
+                               default=0.5, help="Minimum inaccuracies to discard a position. Default: 0.6")
 
     output_group = parser.add_argument_group(
-        "Output", "Required parameter to output results"
-    )
+        "Output", "Required parameter to output results")
 
-    output_group.add_argument(
-        "-o",
-        "--output",
-        type=str,
-        required=True,
-        help="REQUIRED. Output directory to extract all results",
-    )
+    output_group.add_argument("-o", "--output", type=str, required=True,
+                              help="REQUIRED. Output directory to extract all results")
 
     arguments = parser.parse_args()
 
@@ -420,8 +237,7 @@ def minimap2_mapping(HQ_filename, filename_bam_out, reference):
     # --threads: Number of additional threads to use
 
     cmd_minimap2 = "minimap2 -ax map-ont {} {} | samtools view -bS -F 4 - | samtools sort -o {}".format(
-        reference, HQ_filename, filename_bam_out
-    )
+        reference, HQ_filename, filename_bam_out)
     # print(cmd_minimap2)
     execute_subprocess(cmd_minimap2, isShell=True)
 
@@ -430,16 +246,7 @@ def minimap2_mapping(HQ_filename, filename_bam_out, reference):
     execute_subprocess(cmd_indexing, isShell=False)
 
 
-def freebayes_variant(
-    reference,
-    filename_bam_out,
-    output_vcf,
-    threads=36,
-    frequency=0.1,
-    ploidy=1,
-    base_qual=7,
-    map_qual=60,
-):
+def freebayes_variant(reference, filename_bam_out, output_vcf, threads=36, frequency=0.1, ploidy=1, base_qual=7, map_qual=60):
     """
     https://github.com/freebayes/freebayes
         # Freebayes-parallel
@@ -460,16 +267,7 @@ def freebayes_variant(
     region_file = create_reference_chunks(reference)
 
     cmd_bayes = "freebayes-parallel {} {} -f {} --haplotype-length 0 --use-best-n-alleles 1 --min-alternate-count 0 --min-alternate-fraction {} -p {} --min-coverage 1 -q {} -m {} --strict-vcf {} > {}".format(
-        region_file,
-        str(threads),
-        reference,
-        str(frequency),
-        str(ploidy),
-        str(base_qual),
-        str(map_qual),
-        filename_bam_out,
-        output_vcf,
-    )
+        region_file, str(threads), reference, str(frequency), str(ploidy), str(base_qual), str(map_qual), filename_bam_out, output_vcf)
     print(cmd_bayes)
     execute_subprocess(cmd_bayes, isShell=True)
 
@@ -484,19 +282,16 @@ def bcftool_filter(output_raw_vcf, output_vcf):
     # --include: include sites for which Expression is true
     # --remove: list of annotations to remove
 
-    # cmd_bcf_view = "bcftools view --include 'QUAL >= 10 && FMT/DP >= 1 && (FMT/AO)/(FMT/DP) >= 0.1' {} -o {}".format(
-    #     output_raw_vcf, output_vcf)
+    # cmd_bcf_view = "bcftools view --include 'QUAL >= 10 && FMT/DP >= 1 && (FMT/AO)/(FMT/DP) >= 0.1' {} -o {}".format(output_raw_vcf, output_vcf)
     # # print(cmd_bcf_view)
     # execute_subprocess(cmd_bcf_view, isShell=True)
 
-    # cmd_bcf_annot = 'bcftools annotate --remove ^INFO/TYPE,^INFO/DP,^INFO/RO,^INFO/AO,^INFO/AB,^FORMAT/GT,^FORMAT/DP,^FORMAT/RO,^FORMAT/AO,^FORMAT/QR,^FORMAT/QA,^FORMAT/GL {} -o {}'.format(
-    #     output_vcf, output_vcf_filt)
+    # cmd_bcf_annot = 'bcftools annotate --remove ^INFO/TYPE,^INFO/DP,^INFO/RO,^INFO/AO,^INFO/AB,^FORMAT/GT,^FORMAT/DP,^FORMAT/RO,^FORMAT/AO,^FORMAT/QR,^FORMAT/QA,^FORMAT/GL {} -o {}'.format(output_vcf, output_vcf_filt)
     # # print(cmd_bcf_annot)
     # execute_subprocess(cmd_bcf_annot, isShell=True)
 
     cmd_bcf = "bcftools view --include 'QUAL >= 10 && FMT/DP >= 1 && (FMT/AO)/(FMT/DP) >= 0.1' {} | bcftools annotate --remove ^INFO/TYPE,^INFO/DP,^INFO/RO,^INFO/AO,^INFO/AB,^FORMAT/GT,^FORMAT/DP,^FORMAT/RO,^FORMAT/AO,^FORMAT/QR,^FORMAT/QA,^FORMAT/GL -o {}".format(
-        output_raw_vcf, output_vcf
-    )
+        output_raw_vcf, output_vcf)
     # print(cmd_bcf)
     execute_subprocess(cmd_bcf, isShell=True)
 
@@ -508,8 +303,7 @@ def snippy_sub(output_vcf_filt, output_vcf_sub):
     """
 
     cmd_snippy_subs = "snippy-vcf_extract_subs {} > {}".format(
-        output_vcf_filt, output_vcf_sub
-    )
+        output_vcf_filt, output_vcf_sub)
     # print(cmd_snippy_subs)
     execute_subprocess(cmd_snippy_subs, isShell=True)
 
@@ -525,6 +319,8 @@ if __name__ == "__main__":
     group_name = output_dir.split("/")[-1]
     check_create_dir(output_dir)
     reference = os.path.abspath(args.reference)
+    kraken2_db = os.path.abspath(args.kraken2_db)
+    mash_db = os.path.abspath(args.mash_db)
 
     # Logging
     # Create log file with date and time
@@ -554,12 +350,7 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
 
     logger.info(
-        "\n"
-        + BLUE
-        + "############### START VARIANT CALLING ###############"
-        + END_FORMATTING
-        + "\n"
-    )
+        "\n" + BLUE + "############### START VARIANT CALLING ###############" + END_FORMATTING + "\n")
     logger.info(args)
 
     # Obtain all fastq files from folder
@@ -592,20 +383,16 @@ if __name__ == "__main__":
 
     new_samples = check_reanalysis(args.output, sample_list_F)
 
-    logger.info(
-        CYAN
-        + "\n%d samples will be analysed: %s"
-        % (len(sample_list_F), ",".join(sample_list_F))
-        + END_FORMATTING + '\n'
-    )
-    logger.info(
-        CYAN
-        + "\n%d NEW samples will be analysed: %s"
-        % (len(new_samples), ",".join(new_samples))
-        + END_FORMATTING + '\n'
-    )
+    logger.info(CYAN + "\n%d samples will be analysed: %s" %
+                (len(sample_list_F), ",".join(sample_list_F)) + END_FORMATTING + '\n')
+
+    logger.info(CYAN + "\n%d NEW samples will be analysed: %s" %
+                (len(new_samples), ",".join(new_samples)) + END_FORMATTING + '\n')
 
     # Declare folders created in pipeline and key files
+
+    out_species_dir = os.path.join(output_dir, "Species")
+    check_create_dir(out_species_dir)
 
     out_bam_dir = os.path.join(output_dir, "Bam")
     check_create_dir(out_bam_dir)
@@ -625,9 +412,6 @@ if __name__ == "__main__":
         out_stats_dir, "Coverage")  # subfolder
     check_create_dir(out_stats_coverage_dir)
 
-    out_compare_dir = os.path.join(output_dir, "Compare")
-    check_create_dir(out_compare_dir)
-
     out_annot_dir = os.path.join(output_dir, "Annotation")
     check_create_dir(out_annot_dir)
     out_annot_snpeff_dir = os.path.join(out_annot_dir, "snpeff")  # subfolder
@@ -638,6 +422,9 @@ if __name__ == "__main__":
     check_create_dir(out_annot_user_aa_dir)
     out_annot_blast_dir = os.path.join(out_annot_dir, "blast")  # subfolder
     check_create_dir(out_annot_blast_dir)
+
+    out_compare_dir = os.path.join(output_dir, "Compare")
+    check_create_dir(out_compare_dir)
 
     samtools_faidx(args.reference)
 
@@ -659,40 +446,11 @@ if __name__ == "__main__":
             if sample in new_samples:
                 new_sample_number = str(int(new_sample_number) + 1)
                 new_sample_total = str(len(new_samples))
-                logger.info(
-                    "\n"
-                    + WHITE_BG
-                    + "STARTING SAMPLE: "
-                    + sample
-                    + " ("
-                    + sample_number
-                    + "/"
-                    + sample_total
-                    + ")"
-                    + " ("
-                    + new_sample_number
-                    + "/"
-                    + new_sample_total
-                    + ")"
-                    + END_FORMATTING
-                )
+                logger.info("\n" + WHITE_BG + "STARTING SAMPLE: " + sample + " (" + sample_number + "/" +
+                            sample_total + ")" + " (" + new_sample_number + "/" + new_sample_total + ")" + END_FORMATTING)
             else:
-                logger.info(
-                    "\n"
-                    + WHITE_BG
-                    + "STARTING SAMPLE: "
-                    + sample
-                    + " ("
-                    + sample_number
-                    + "/"
-                    + sample_total
-                    + ")"
-                    + END_FORMATTING
-                )
-
-            ##### MAPPING #####
-
-            # Mapping with minimap2, sorting Bam and indexing it (also can be made with bwa index & bwa mem -x ont2d)
+                logger.info("\n" + WHITE_BG + "STARTING SAMPLE: " + sample +
+                            " (" + sample_number + "/" + sample_total + ")" + END_FORMATTING)
 
             # if not os.path.isfile(output_final_vcf):
             HQ_filename = os.path.join(
@@ -701,43 +459,80 @@ if __name__ == "__main__":
             # filename_out = sample.split('.')[0].split('_')[1]
             filename_out = sample
             # print(filename_out)
+
+            logger.info("\n" + GREEN + BOLD +
+                        "STARTING ANALYSIS FOR SAMPLE " + filename_out + END_FORMATTING + '\n')
+
+            ##### SPECIES DETERMINATION #####
+
+            prior = datetime.datetime.now()
+
+            # Species determination with kraken2 and its standard database and visualization with ImportTaxonomy.pl from kronatools kit
+
+            sample_species_dir = os.path.join(out_species_dir, sample)
+            # print(sample_species_dir)
+            check_create_dir(sample_species_dir)
+            report = os.path.join(sample_species_dir, sample)
+            krona_html = os.path.join(report + ".html")
+            mash_output = os.path.join(report + ".screen.tab")
+
+            if args.kraken2_db != False:
+                if os.path.isfile(krona_html):
+                    logger.info(
+                        YELLOW + krona_html + " EXIST\nOmmiting species determination with Kraken2 for " + sample + END_FORMATTING)
+                else:
+                    logger.info(
+                        GREEN + "Species determination with Kraken2 for sample " + sample + END_FORMATTING)
+                    kraken(HQ_filename, report, args.kraken2_db,
+                           krona_html, threads=args.threads)
+
+            # Species determination with mash and its bacterial database
+
+            if args.mash_db != False:
+                if os.path.isfile(mash_output):
+                    logger.info(
+                        YELLOW + mash_output + " EXIST\nOmmiting species determination with Mash screen for " + sample + END_FORMATTING)
+                else:
+                    logger.info(
+                        GREEN + "Species determination with Mash for sample " + sample + END_FORMATTING)
+
+                    mash_screen(HQ_filename, mash_output,
+                                args.mash_db, winner=True, threads=args.threads)
+
+                    # Name the columns of the mash output and sort them in descending order by identity
+                    output_sort_species = pd.read_csv(mash_output, sep='\t', header=None, names=[
+                                                      'Identity', 'Share-hashes', 'Median-multiplicity', 'p-value', 'ID accession', 'Organism']).sort_values(by=['Identity'], ascending=False)
+                    output_sort_species.to_csv(
+                        mash_output, sep='\t', index=None)
+
+            after = datetime.datetime.now()
+            print(("Done with function kraken & mash_screen in: %s" %
+                  (after - prior) + "\n"))
+
+            ##### MAPPING #####
+
+            # Mapping with minimap2, sorting Bam and indexing it (also can be made with bwa index & bwa mem -x ont2d)
+
+            prior = datetime.datetime.now()
+
             filename_bam_out = os.path.join(
                 out_bam_dir, filename_out + ".sort.bam")
             filename_bai_out = os.path.join(
                 out_bam_dir, filename_out + ".sort.bam.bai")
             # print(filename_bam_out)
 
-            logger.info(
-                "\n"
-                + GREEN
-                + BOLD
-                + "STARTING ANALYSIS FOR SAMPLE "
-                + filename_out
-                + END_FORMATTING
-            )
-
-            prior = datetime.datetime.now()
-
             if os.path.isfile(filename_bai_out):
-                logger.info(
-                    YELLOW
-                    + filename_bam_out
-                    + " EXIST\nOmmiting mapping for "
-                    + filename_out
-                    + END_FORMATTING
-                )
+                logger.info(YELLOW + filename_bam_out +
+                            " EXIST\nOmmiting mapping for " + filename_out + END_FORMATTING)
             else:
                 logger.info(GREEN + "Mapping sample " +
                             filename_out + END_FORMATTING)
-                minimap2_mapping(
-                    HQ_filename, filename_bam_out, reference=args.reference
-                )
+                minimap2_mapping(HQ_filename, filename_bam_out,
+                                 reference=args.reference)
 
             after = datetime.datetime.now()
-            print(
-                ("Done with function minimap2_mapping in: %s" %
-                 (after - prior) + "\n")
-            )
+            print(("Done with function minimap2_mapping in: %s" %
+                  (after - prior) + "\n"))
 
             ##### VARIANT CALLING #####
 
@@ -757,38 +552,16 @@ if __name__ == "__main__":
 
                 if os.path.isfile(output_raw_vcf):
                     logger.info(
-                        YELLOW
-                        + output_raw_vcf
-                        + " EXIST\nOmmiting Variant Calling for sample "
-                        + filename_out
-                        + END_FORMATTING
-                    )
+                        YELLOW + output_raw_vcf + " EXIST\nOmmiting Variant Calling for sample " + filename_out + END_FORMATTING)
                 else:
                     logger.info(
-                        GREEN
-                        + "Starting Variant Calling for sample "
-                        + filename_out
-                        + END_FORMATTING
-                    )
-                    freebayes_variant(
-                        args.reference,
-                        filename_bam_out,
-                        output_raw_vcf,
-                        threads=args.threads,
-                        frequency=args.min_allele_frequency,
-                        ploidy=args.ploidy,
-                        base_qual=args.min_quality,
-                        map_qual=args.min_mapping,
-                    )
+                        GREEN + "Starting Variant Calling for sample " + filename_out + END_FORMATTING)
+                    freebayes_variant(args.reference, filename_bam_out, output_raw_vcf, threads=args.threads,
+                                      frequency=args.min_allele_frequency, ploidy=args.ploidy, base_qual=args.min_quality, map_qual=args.min_mapping)
 
                 after = datetime.datetime.now()
-                print(
-                    (
-                        "Done with function freebayes_variant in: %s" % (
-                            after - prior)
-                        + "\n"
-                    )
-                )
+                print(("Done with function freebayes_variant in: %s" %
+                      (after - prior) + "\n"))
 
                 # Filtering the raw variant calling by quality, depth and frequency with bcftools. Also extracting complex variations and MNP with snippy-vcf_extract_subs
 
@@ -805,166 +578,97 @@ if __name__ == "__main__":
 
                 if os.path.isfile(output_vcf_sub):
                     logger.info(
-                        YELLOW
-                        + output_vcf_sub
-                        + " EXIST\nOmmiting Variant Calling filter in "
-                        + filename_out
-                        + END_FORMATTING
-                    )
+                        YELLOW + output_vcf_sub + " EXIST\nOmmiting Variant Calling filter in " + filename_out + END_FORMATTING)
                 else:
                     logger.info(
-                        GREEN
-                        + "Variant Calling filtering in sample "
-                        + filename_out
-                        + END_FORMATTING
-                    )
+                        GREEN + "Variant Calling filtering in sample " + filename_out + END_FORMATTING)
                     bcftool_filter(output_raw_vcf, output_vcf)
                     snippy_sub(output_vcf, output_vcf_sub)
 
                 after = datetime.datetime.now()
-                print(
-                    (
-                        "Done with function bcftools_filter & snippy_sub in: %s"
-                        % (after - prior)
-                        + "\n"
-                    )
-                )
+                print(("Done with function bcftools_filter & snippy_sub in: %s" % (
+                    after - prior) + "\n"))
 
                 # Variant format combination, extracting INDELs and combining with subs.vcf (SNPs, MNPs and complex)
 
                 out_variant_indel_sample = os.path.join(
-                    sample_variant_dir, "snps.indel.vcf"
-                )
+                    sample_variant_dir, "snps.indel.vcf")
                 # print(out_variant_indel_sample)
                 out_variant_all_sample = os.path.join(
-                    sample_variant_dir, "snps.all.vcf"
-                )
+                    sample_variant_dir, "snps.all.vcf")
                 # print(out_variant_all_sample)
                 chrom_filename = os.path.join(
-                    sample_variant_dir, "snps.all.chromosome.vcf"
-                )
+                    sample_variant_dir, "snps.all.chromosome.vcf")
                 # print(chrom_filename)
 
                 prior = datetime.datetime.now()
 
                 if os.path.isfile(out_variant_indel_sample):
-                    logger.info(
-                        YELLOW
-                        + out_variant_indel_sample
-                        + " EXIST\nOmmiting INDEL filtering in "
-                        + filename_out
-                        + END_FORMATTING
-                    )
+                    logger.info(YELLOW + out_variant_indel_sample +
+                                " EXIST\nOmmiting INDEL filtering in " + filename_out + END_FORMATTING)
                 else:
-                    logger.info(
-                        GREEN + "Filtering INDELs in " + filename_out + END_FORMATTING
-                    )
+                    logger.info(GREEN + "Filtering INDELs in " +
+                                filename_out + END_FORMATTING)
                     extract_indels(output_vcf)
 
                 if os.path.isfile(out_variant_all_sample):
-                    logger.info(
-                        YELLOW
-                        + out_variant_all_sample
-                        + "EXIST\nOmmiting VCF combination for sample "
-                        + filename_out
-                        + END_FORMATTING
-                    )
+                    logger.info(YELLOW + out_variant_all_sample +
+                                "EXIST\nOmmiting VCF combination for sample " + filename_out + END_FORMATTING)
                 else:
-                    logger.info(
-                        GREEN + "Combining VCF in " + filename_out + END_FORMATTING
-                    )
+                    logger.info(GREEN + "Combining VCF in " +
+                                filename_out + END_FORMATTING)
                     merge_vcf(output_vcf_sub, out_variant_indel_sample)
 
                 after = datetime.datetime.now()
-                print(
-                    (
-                        "Done with function extract_indels & merge_vcf in: %s"
-                        % (after - prior)
-                        + "\n"
-                    )
-                )
+                print(("Done with function extract_indels & merge_vcf in: %s" %
+                      (after - prior) + "\n"))
 
                 # Variant format adaptation
 
                 out_variant_tsv_file = os.path.join(
-                    sample_variant_dir, "snps.all.ivar.tsv"
-                )
+                    sample_variant_dir, "snps.all.ivar.tsv")
                 # print(out_variant_tsv_file)
 
                 prior = datetime.datetime.now()
 
                 if os.path.isfile(out_variant_tsv_file):
-                    logger.info(
-                        YELLOW
-                        + out_variant_tsv_file
-                        + " EXIST\nOmmiting format adaptation for "
-                        + filename_out
-                        + END_FORMATTING
-                    )
+                    logger.info(YELLOW + out_variant_tsv_file +
+                                " EXIST\nOmmiting format adaptation for " + filename_out + END_FORMATTING)
                 else:
                     logger.info(
-                        GREEN
-                        + "Adapting variants format in sample "
-                        + filename_out
-                        + END_FORMATTING
-                    )
+                        GREEN + "Adapting variants format in sample " + filename_out + END_FORMATTING)
                     vcf_to_ivar_tsv(out_variant_all_sample,
                                     out_variant_tsv_file)
 
                 after = datetime.datetime.now()
-                print(
-                    (
-                        "Done with function vcf_to_ivar_tsv in: %s" % (
-                            after - prior)
-                        + "\n"
-                    )
-                )
+                print(("Done with function vcf_to_ivar_tsv in: %s" %
+                      (after - prior) + "\n"))
 
                 ##### CONSENSUS #####
 
                 # Building consensus fasta file with samtools mpileup and ivar consensus
 
                 out_consensus_file = os.path.join(
-                    out_consensus_dir, filename_out + ".fa"
-                )
+                    out_consensus_dir, filename_out + ".fa")
                 # print(out_consensus_file)
 
                 prior = datetime.datetime.now()
 
                 if os.path.isfile(out_consensus_file):
-                    logger.info(
-                        YELLOW
-                        + out_consensus_file
-                        + " EXIST\nOmmiting Consensus for "
-                        + filename_out
-                        + END_FORMATTING
-                    )
+                    logger.info(YELLOW + out_consensus_file +
+                                " EXIST\nOmmiting Consensus for " + filename_out + END_FORMATTING)
                 else:
                     logger.info(
-                        GREEN
-                        + "Creating Consensus in sample "
-                        + filename_out
-                        + END_FORMATTING
-                    )
-                    ivar_consensus(
-                        filename_bam_out,
-                        out_consensus_dir,
-                        filename_out,
-                        min_quality=15,
-                        min_frequency_threshold=0.6,
-                        min_depth=5,
-                        uncovered_character="N",
-                    )
+                        GREEN + "Creating Consensus in sample " + filename_out + END_FORMATTING)
+
+                    # Find another solution, if we set q>7 an error occur "Segmentation fault", they are trying to fix it.
+                    ivar_consensus(filename_bam_out, out_consensus_dir, filename_out, min_quality=5,
+                                   min_frequency_threshold=0.6, min_depth=5, uncovered_character="N")
                     replace_consensus_header(out_consensus_file)
 
                 after = datetime.datetime.now()
-                print(
-                    (
-                        "Done with function ivar_consensus & replace_consensus_header in: %s"
-                        % (after - prior)
-                        + "\n"
-                    )
-                )
+                print(("Done with function ivar_consensus & replace_consensus_header in: %s" % (
+                    after - prior) + "\n"))
 
         ##### CREATE STATS AND QUALITY FILTERS #####
 
@@ -979,17 +683,11 @@ if __name__ == "__main__":
         prior = datetime.datetime.now()
 
         if os.path.isfile(out_bamstats_file):
-            logger.info(
-                YELLOW
-                + out_bamstats_file
-                + "EXIST\nOmmiting Bamstats for "
-                + filename_out
-                + END_FORMATTING
-            )
+            logger.info(YELLOW + out_bamstats_file +
+                        "EXIST\nOmmiting Bamstats for " + filename_out + END_FORMATTING)
         else:
-            logger.info(
-                GREEN + "Creating Bamstats in sample " + filename_out + END_FORMATTING
-            )
+            logger.info(GREEN + "Creating Bamstats in sample " +
+                        filename_out + END_FORMATTING)
             create_bamstat(filename_bam_out, out_bamstats_file,
                            threads=args.threads)
 
@@ -1007,17 +705,11 @@ if __name__ == "__main__":
         prior = datetime.datetime.now()
 
         if os.path.isfile(out_coverage_file):
-            logger.info(
-                YELLOW
-                + out_coverage_file
-                + " EXIST\nOmmiting Coverage for "
-                + filename_out
-                + END_FORMATTING
-            )
+            logger.info(YELLOW + out_coverage_file +
+                        " EXIST\nOmmiting Coverage for " + filename_out + END_FORMATTING)
         else:
-            logger.info(
-                GREEN + "Creating Coverage in sample " + filename_out + END_FORMATTING
-            )
+            logger.info(GREEN + "Creating Coverage in sample " +
+                        filename_out + END_FORMATTING)
             create_coverage(filename_bam_out, out_coverage_file)
 
         after = datetime.datetime.now()
@@ -1028,58 +720,33 @@ if __name__ == "__main__":
 
     prior = datetime.datetime.now()
 
-    logger.info(
-        GREEN
-        + BOLD
-        + "Creating summary report for coverage results in group "
-        + group_name
-        + END_FORMATTING
-    )
+    logger.info(GREEN + BOLD + "Creating summary report for coverage results in group " +
+                group_name + END_FORMATTING)
     obtain_group_cov_stats(out_stats_dir, group_name)
 
     # Reads and Variants output summary
 
-    logger.info(
-        GREEN
-        + BOLD
-        + "Creating overal summary report in group "
-        + group_name
-        + END_FORMATTING
-    )
+    logger.info(GREEN + BOLD + "Creating overal summary report in group " +
+                group_name + END_FORMATTING)
     obtain_overal_stats(out_stats_dir, output_dir, group_name)
 
     after = datetime.datetime.now()
-    print(
-        (
-            "Done with function obtain_group_cov_stats & obtain_overal_stats in: %s"
-            % (after - prior)
-            + "\n"
-        )
-    )
+    print(("Done with function obtain_group_cov_stats & obtain_overal_stats in: %s" % (
+        after - prior) + "\n"))
 
     # Remove Uncovered
 
     prior = datetime.datetime.now()
 
-    logger.info(
-        GREEN + "Removing low quality samples in group " + group_name + END_FORMATTING
-    )
+    logger.info(GREEN + "Removing low quality samples in group " +
+                group_name + END_FORMATTING)
 
     uncovered_samples = remove_low_quality(
-        input_dir,
-        output_dir,
-        min_coverage=args.coverage20,
-        min_hq_snp=args.min_snp,
-        type_remove="Uncovered",
-    )
+        input_dir, output_dir, min_coverage=args.coverage20, min_hq_snp=args.min_snp, type_remove="Uncovered")
 
     if len(uncovered_samples) > 1:
-        logger.info(
-            RED
-            + "Uncovered samples: "
-            + (",").join(uncovered_samples)
-            + END_FORMATTING
-        )
+        logger.info(RED + BOLD + "Uncovered samples: " +
+                    (",").join(uncovered_samples) + END_FORMATTING)
     else:
         logger.info(GREEN + "NO uncovered samples found" + END_FORMATTING)
 
@@ -1088,15 +755,8 @@ if __name__ == "__main__":
 
     ##### ANNOTATION #####
 
-    logger.info(
-        "\n\n"
-        + BLUE
-        + BOLD
-        + "STARTING ANNOTATION IN GROUP: "
-        + group_name
-        + END_FORMATTING
-        + "\n"
-    )
+    logger.info("\n\n" + BLUE + BOLD + "STARTING ANNOTATION IN GROUP: " +
+                group_name + END_FORMATTING + "\n")
 
     # Annotation with SnpEFF
 
@@ -1114,50 +774,26 @@ if __name__ == "__main__":
                     chrom_filename = os.path.join(
                         root, "snps.all.chromosome.vcf")
                     out_annot_file = os.path.join(
-                        out_annot_snpeff_dir, sample + ".annot"
-                    )
+                        out_annot_snpeff_dir, sample + ".annot")
                     # print(out_annot_file)
 
                     if os.path.isfile(out_annot_file):
-                        logger.info(
-                            YELLOW
-                            + DIM
-                            + out_annot_file
-                            + " EXIST\nOmmiting SnpEFF Annotation for sample "
-                            + sample
-                            + END_FORMATTING
-                        )
+                        logger.info(YELLOW + DIM + out_annot_file +
+                                    " EXIST\nOmmiting SnpEFF Annotation for sample " + sample + END_FORMATTING)
                     else:
                         logger.info(
-                            GREEN
-                            + "Annotating sample with SnpEFF: "
-                            + sample
-                            + END_FORMATTING
-                        )
+                            GREEN + "Annotating sample with SnpEFF: " + sample + END_FORMATTING)
                         rename_reference_snpeff(filename, chrom_filename)
                         annotate_snpeff(
-                            chrom_filename,
-                            out_annot_file,
-                            database=args.snpeff_database,
-                        )
+                            chrom_filename, out_annot_file, database=args.snpeff_database)
 
     else:
-        logger.info(
-            YELLOW
-            + BOLD
-            + "No SnpEFF database suplied, skipping annotation in group "
-            + group_name
-            + END_FORMATTING
-        )
+        logger.info(YELLOW + BOLD + "No SnpEFF database suplied, skipping annotation in group " +
+                    group_name + END_FORMATTING)
 
     after = datetime.datetime.now()
-    print(
-        (
-            "Done with function rename_reference_snpeff & annotate_snpeff in: %s"
-            % (after - prior)
-            + "\n"
-        )
-    )
+    print(("Done with function rename_reference_snpeff & annotate_snpeff in: %s" % (
+        after - prior) + "\n"))
 
     # Annotation for user defined (bed & vcf annot)
 
@@ -1165,11 +801,7 @@ if __name__ == "__main__":
 
     if not args.annot_bed and not args.annot_vcf:
         logger.info(
-            YELLOW
-            + BOLD
-            + "Ommiting User Annotation, no BED or VCF files supplied"
-            + END_FORMATTING
-        )
+            YELLOW + BOLD + "Ommiting User Annotation, no BED or VCF files supplied" + END_FORMATTING)
     else:
         for root, _, files in os.walk(out_variant_dir):
             for name in files:
@@ -1184,11 +816,7 @@ if __name__ == "__main__":
                     out_annot_file = os.path.join(
                         out_annot_user_dir, sample + ".tsv")
                     user_annotation(
-                        filename,
-                        out_annot_file,
-                        vcf_files=args.annot_vcf,
-                        bed_files=args.annot_bed,
-                    )
+                        filename, out_annot_file, vcf_files=args.annot_vcf, bed_files=args.annot_bed)
 
     after = datetime.datetime.now()
     print(("Done with function user_annotation in: %s" % (after - prior) + "\n"))
@@ -1199,11 +827,7 @@ if __name__ == "__main__":
 
     if not args.annot_aa:
         logger.info(
-            YELLOW
-            + BOLD
-            + "Ommiting User aa annotation, no AA files supplied"
-            + END_FORMATTING
-        )
+            YELLOW + BOLD + "Ommiting User aa annotation, no AA files supplied" + END_FORMATTING)
     else:
         for root, _, files in os.walk(out_annot_snpeff_dir):
             if root == out_annot_snpeff_dir:
@@ -1214,19 +838,14 @@ if __name__ == "__main__":
                             "User aa annotation in sample {}".format(sample))
                         filename = os.path.join(root, name)
                         out_annot_aa_file = os.path.join(
-                            out_annot_user_aa_dir, sample + ".tsv"
-                        )
+                            out_annot_user_aa_dir, sample + ".tsv")
 
                         if os.path.isfile(out_annot_aa_file):
                             user_annotation_aa(
-                                out_annot_aa_file,
-                                out_annot_aa_file,
-                                aa_files=args.annot_aa,
-                            )
+                                out_annot_aa_file, out_annot_aa_file, aa_files=args.annot_aa)
                         else:
                             user_annotation_aa(
-                                filename, out_annot_aa_file, aa_files=args.annot_aa
-                            )
+                                filename, out_annot_aa_file, aa_files=args.annot_aa)
 
     after = datetime.datetime.now()
     print(("Done with function user_annotation_aa in: %s" % (after - prior) + "\n"))
@@ -1237,11 +856,7 @@ if __name__ == "__main__":
 
     if not args.annot_fasta:
         logger.info(
-            YELLOW
-            + BOLD
-            + "Ommiting User FASTA annotation, no FASTA files supplied"
-            + END_FORMATTING
-        )
+            YELLOW + BOLD + "Ommiting User FASTA annotation, no FASTA files supplied" + END_FORMATTING)
     else:
         for root, _, files in os.walk(out_consensus_dir):
             for name in files:
@@ -1252,16 +867,8 @@ if __name__ == "__main__":
                         "User FASTA annotation in sample {}".format(sample))
 
                     for db in args.annot_fasta:
-                        make_blast(
-                            filename,
-                            db,
-                            sample,
-                            out_annot_blast_dir,
-                            db_type="nucl",
-                            query_type="nucl",
-                            evalue=0.0001,
-                            threads=args.threads,
-                        )
+                        make_blast(filename, db, sample, out_annot_blast_dir, db_type="nucl",
+                                   query_type="nucl", evalue=0.0001, threads=args.threads)
 
     after = datetime.datetime.now()
     print(("Done with function make_blast in: %s" % (after - prior) + "\n"))
@@ -1270,15 +877,8 @@ if __name__ == "__main__":
 
     # SNPs comparison using tsv variant files
 
-    logger.info(
-        "\n\n"
-        + GREEN
-        + BOLD
-        + "STARTING COMPARISON IN GROUP: "
-        + group_name
-        + END_FORMATTING
-        + "\n"
-    )
+    logger.info("\n\n" + GREEN + BOLD + "STARTING COMPARISON IN GROUP: " +
+                group_name + END_FORMATTING + "\n")
 
     folder_compare = today + "_" + group_name
     path_compare = os.path.join(out_compare_dir, folder_compare)
@@ -1287,35 +887,23 @@ if __name__ == "__main__":
 
     compare_snp_matrix_recal = full_path_compare + ".revised.final.tsv"
     compare_snp_matrix_recal_intermediate = (
-        full_path_compare + ".revised_intermediate.tsv"
-    )
+        full_path_compare + ".revised_intermediate.tsv")
     compare_snp_matrix_recal_mpileup = (
-        full_path_compare + ".revised_intermediate_vcf.tsv"
-    )
+        full_path_compare + ".revised_intermediate_vcf.tsv")
     compare_snp_matrix_INDEL_intermediate = (
-        full_path_compare + ".revised_INDEL_intermediate.tsv"
-    )
+        full_path_compare + ".revised_INDEL_intermediate.tsv")
 
     # Create intermediate
 
     prior = datetime.datetime.now()
 
     recalibrated_snp_matrix_intermediate = ddbb_create_intermediate(
-        out_variant_dir,
-        out_stats_coverage_dir,
-        min_freq_discard=0.1,
-        min_alt_dp=10,
-        only_snp=False,
-    )
-    # recalibrated_snp_matrix_intermediate.to_csv(
-    #     compare_snp_matrix_recal_intermediate, sep="\t", index=False
-    # )
+        out_variant_dir, out_stats_coverage_dir, min_freq_discard=args.min_allele_frequency, min_alt_dp=args.min_depth, only_snp=False)
+    # recalibrated_snp_matrix_intermediate.to_csv(compare_snp_matrix_recal_intermediate, sep="\t", index=False)
 
     after = datetime.datetime.now()
-    print(
-        ("Done with function ddbb_create_intermediate in: %s" %
-         (after - prior) + "\n")
-    )
+    print(("Done with function ddbb_create_intermediate in: %s" %
+          (after - prior) + "\n"))
 
     # Remove SNPs from BED file (PE/PPE)
 
@@ -1327,10 +915,8 @@ if __name__ == "__main__":
             recalibrated_snp_matrix_intermediate, args.remove_bed)
 
         after = datetime.datetime.now()
-        print(
-            ('\n' + "Done with function remove_bed_positions in: %s" %
-             (after - prior) + "\n")
-        )
+        print(('\n' + "Done with function remove_bed_positions in: %s" %
+              (after - prior) + "\n"))
 
     recalibrated_snp_matrix_intermediate.to_csv(
         compare_snp_matrix_recal_intermediate, sep="\t", index=False)
@@ -1345,10 +931,8 @@ if __name__ == "__main__":
         compare_snp_matrix_recal_mpileup, sep="\t", index=False)
 
     after = datetime.datetime.now()
-    print(
-        ('\n' + "Done with function recalibrate_ddbb_vcf_intermediate in: %s" %
-         (after - prior) + "\n")
-    )
+    print(('\n' + "Done with function recalibrate_ddbb_vcf_intermediate in: %s" %
+          (after - prior) + "\n"))
 
     # Remove SNPs located within INDELs
 
@@ -1360,10 +944,8 @@ if __name__ == "__main__":
         compare_snp_matrix_INDEL_intermediate, sep='\t', index=False)
 
     after = datetime.datetime.now()
-    print(
-        ("Done with function remove_position_range in: %s" %
-         (after - prior) + "\n")
-    )
+    print(("Done with function remove_position_range in: %s" %
+          (after - prior) + "\n"))
 
     # Extract all positions marked as complex
 
@@ -1374,10 +956,8 @@ if __name__ == "__main__":
         (','.join([str(x) for x in complex_variants]))))
 
     after = datetime.datetime.now()
-    print(
-        ("Done with function extract_complex_list in: %s" %
-         (after - prior) + "\n")
-    )
+    print(("Done with function extract_complex_list in: %s" %
+          (after - prior) + "\n"))
 
     # Clean all faulty positions and samples for final table
 
@@ -1389,10 +969,7 @@ if __name__ == "__main__":
         compare_snp_matrix_recal, sep='\t', index=False)
 
     after = datetime.datetime.now()
-    print(
-        ("Done with function revised_df in: %s" %
-         (after - prior) + "\n")
-    )
+    print(("Done with function revised_df in: %s" % (after - prior) + "\n"))
 
     # Matrix to pairwise and nwk
 
@@ -1401,19 +978,10 @@ if __name__ == "__main__":
     ddtb_compare(compare_snp_matrix_recal, distance=5)
 
     after = datetime.datetime.now()
-    print(
-        ("Done with function ddtb_compare in: %s" %
-         (after - prior) + "\n")
-    )
+    print(("Done with function ddtb_compare in: %s" % (after - prior) + "\n"))
 
     logger.info('\n' + MAGENTA + BOLD + 'COMPARISON FINISHED IN GROUP: ' +
                 group_name + END_FORMATTING + '\n')
 
-    logger.info(
-        "\n"
-        + MAGENTA
-        + BOLD
-        + "##### END OF ONT VARIANT CALLING PIPELINE #####"
-        + "\n"
-        + END_FORMATTING
-    )
+    logger.info("\n" + MAGENTA + BOLD +
+                "##### END OF ONT VARIANT CALLING PIPELINE #####" + "\n" + END_FORMATTING)
