@@ -42,148 +42,58 @@ DIM = "\033[2m"
 def get_arguments():
 
     parser = argparse.ArgumentParser(
-        prog="compare_snp_prokaion.py",
-        description="Pipeline to compare variants (SNVs) with any non model organism. Specialised in Mycobacterium tuberculosis",
-    )
+        prog="compare_snp_prokaion.py", description="Pipeline to compare variants (SNVs) with any non model organism. Specialised in Mycobacterium tuberculosis")
 
-    parser.add_argument(
-        '-i',
-        '--input',
-        dest="input_dir",
-        metavar="input_directory",
-        type=str,
-        required=False,
-        help='REQUIRED. Input directory containing all vcf files',
-    )
+    parser.add_argument('-i', '--input', dest="input_dir", metavar="input_directory",
+                        type=str, required=False, help='REQUIRED. Input directory containing all vcf files')
 
-    parser.add_argument(
-        '-s',
-        '--sample_list',
-        default=False,
-        required=False,
-        help='File with sample names to analyse instead of all samples',
-    )
+    parser.add_argument('-s', '--sample_list', default=False, required=False,
+                        help='File with sample names to analyse instead of all samples')
 
-    parser.add_argument(
-        '-d',
-        '--distance',
-        default=0,
-        required=False,
-        help='Minimun distance to cluster groups after comparison',
-    )
+    parser.add_argument('-d', '--distance', default=0, required=False,
+                        help='Minimun distance to cluster groups after comparison')
 
-    parser.add_argument(
-        '-c',
-        '--only-compare',
-        dest="only_compare",
-        required=False,
-        default=False,
-        help='Add already calculated snp binary matrix',
-    )
+    parser.add_argument('-c', '--only-compare', dest="only_compare", required=False,
+                        default=False, help='Add already calculated snp binary matrix')
 
-    parser.add_argument(
-        '-r',
-        '--recalibrate',
-        required=False,
-        type=str,
-        default=False,
-        help='Coverage folder',
-    )
+    parser.add_argument('-r', '--recalibrate', required=False,
+                        type=str, default=False, help='Coverage folder')
 
-    parser.add_argument(
-        '-b',
-        '--bam_folder',
-        required=False,
-        type=str,
-        default=False,
-        help='Bam folder',
-    )
+    parser.add_argument('-b', '--bam_folder', required=False,
+                        type=str, default=False, help='Bam folder')
 
-    parser.add_argument(
-        '-w',
-        '--window',
-        required=False,
-        type=int,
-        default=2,
-        help='Number of snps in 10 to discard. Default: 2',
-    )
+    parser.add_argument('-w', '--window', required=False, type=int,
+                        default=2, help='Number of snps in 10 to discard. Default: 2')
 
-    parser.add_argument(
-        '-C',
-        '--complex',
-        required=False,
-        action='store_true',
-        help='Remove complex positions',
-    )
+    parser.add_argument('-C', '--complex', required=False,
+                        action='store_true', help='Remove complex positions')
 
-    parser.add_argument(
-        '-B',
-        '--remove_bed',
-        required=False,
-        type=str,
-        default=False,
-        help='BED file with positions to remove'
-    )
+    parser.add_argument('-B', '--remove_bed', required=False, type=str,
+                        default=False, help='BED file with positions to remove')
 
-    parser.add_argument(
-        '-R',
-        '--reference',
-        required=False,
-        type=str,
-        default=False,
-        help='Reference fasta file used in original variant calling',
-    )
+    parser.add_argument('-R', '--reference', required=False, type=str, default=False,
+                        help='Reference fasta file used in original variant calling')
 
-    parser.add_argument(
-        "--min_threshold_discard_uncov_sample",
-        required=False,
-        type=float,
-        default=0.6,
-        help="Minimum uncovered genome to discard a sample. Default: 0.6",
-    )
+    parser.add_argument("--min_threshold_discard_uncov_sample", required=False, type=float,
+                        default=0.6, help="Minimum uncovered genome to discard a sample. Default: 0.6")
 
-    parser.add_argument(
-        "--min_threshold_discard_uncov_pos",
-        required=False,
-        type=float,
-        default=0.5,
-        help="Minimum covered position to discard it. Default: 0.5",
-    )
+    parser.add_argument("--min_threshold_discard_uncov_pos", required=False, type=float,
+                        default=0.5, help="Minimum covered position to discard it. Default: 0.5")
 
-    parser.add_argument(
-        "--min_threshold_discard_htz_sample",
-        required=False,
-        type=float,
-        default=0.6,
-        help="Minimum heterozygosity to discard a sample. Default: 0.6",
-    )
+    parser.add_argument("--min_threshold_discard_htz_sample", required=False, type=float,
+                        default=0.6, help="Minimum heterozygosity to discard a sample. Default: 0.6")
 
-    parser.add_argument(
-        "--min_threshold_discard_htz_pos",
-        required=False,
-        type=float,
-        default=0.5,
-        help="Minimum heterozygosity to discard a position. Default: 0.5",
-    )
+    parser.add_argument("--min_threshold_discard_htz_pos", required=False, type=float,
+                        default=0.5, help="Minimum heterozygosity to discard a position. Default: 0.5")
 
-    parser.add_argument(
-        "--min_threshold_discard_all_sample",
-        required=False,
-        type=float,
-        default=0.6,
-        help="Minimum inaccuracies to discard a sample. Default: 0.6",
-    )
+    parser.add_argument("--min_threshold_discard_all_sample", required=False, type=float,
+                        default=0.6, help="Minimum inaccuracies to discard a sample. Default: 0.6")
 
-    parser.add_argument(
-        "--min_threshold_discard_all_pos",
-        required=False,
-        type=float,
-        default=0.5,
-        help="Minimum inaccuracies to discard a position. Default: 0.5",
-    )
+    parser.add_argument("--min_threshold_discard_all_pos", required=False, type=float,
+                        default=0.5, help="Minimum inaccuracies to discard a position. Default: 0.5")
 
     parser.add_argument('-o', '--output', type=str, required=True,
-                        help='Name of all the output files, might include path',)
+                        help='Name of all the output files, might include path')
 
     arguments = parser.parse_args()
 
@@ -214,9 +124,7 @@ def check_file_exists(file_name):
     return os.path.isfile(file_name)
 
 
-def import_tsv_variants(
-    tsv_file, sample, min_total_depth=4, min_alt_dp=7, only_snp=True
-):
+def import_tsv_variants(tsv_file, sample, min_total_depth=4, min_alt_dp=7, only_snp=True):
 
     input_file = os.path.abspath(tsv_file)
 
@@ -283,14 +191,7 @@ def extract_uncovered(cov_file):
     return df
 
 
-def ddbb_create_intermediate(
-    variant_dir,
-    coverage_dir,
-    min_freq_discard=0.1,
-    min_alt_dp=7,
-    only_snp=False,
-    samples=False,
-):
+def ddbb_create_intermediate(variant_dir, coverage_dir, min_freq_discard=0.1, min_alt_dp=7, only_snp=False, samples=False):
 
     df = pd.DataFrame(columns=["REGION", "POS", "REF", "ALT"])
 
@@ -303,24 +204,14 @@ def ddbb_create_intermediate(
                     logger.debug("Adding: " + sample)
                     filename = os.path.join(root, name)
                     dfv = import_tsv_variants(
-                        filename,
-                        sample,
-                        min_total_depth=4,
-                        min_alt_dp=4,
-                        only_snp=only_snp,
-                    )
+                        filename, sample, min_total_depth=4, min_alt_dp=4, only_snp=only_snp)
                     df = df.merge(dfv, how="outer")
                 else:
                     if sample in samples:
                         logger.debug("Adding: " + sample)
                         filename = os.path.join(root, name)
                         dfv = import_tsv_variants(
-                            filename,
-                            sample,
-                            min_total_depth=4,
-                            min_alt_dp=4,
-                            only_snp=only_snp,
-                        )
+                            filename, sample, min_total_depth=4, min_alt_dp=4, only_snp=only_snp)
                         if dfv.shape[0] > 0:
                             df = df.merge(dfv, how="outer")
                         else:
@@ -580,6 +471,7 @@ def recheck_variant_rawvcf_intermediate(row, positions, alt_snps, variant_dir, m
                                     logger.debug('INTERSECTION PRECOMPLEX: Position: {}, AF: {}, sample: {}'.format(
                                         i, vcf_alt_freq, sample))
                                     row[position_index] = vcf_alt_freq
+
     return row
 
 
@@ -1265,10 +1157,8 @@ if __name__ == '__main__':
         #     compare_snp_matrix_recal_intermediate, sep='\t', index=False)
 
         after = datetime.datetime.now()
-        print(
-            ('\n' + "Done with function ddbb_create_intermediate in: %s" %
-             (after - prior) + "\n")
-        )
+        print(('\n' + "Done with function ddbb_create_intermediate in: %s" %
+              (after - prior) + "\n"))
 
         # Remove SNPs from BED file (PE/PPE)
 
@@ -1280,10 +1170,8 @@ if __name__ == '__main__':
                 recalibrated_snp_matrix_intermediate, args.remove_bed)
 
             after = datetime.datetime.now()
-            print(
-                ('\n' + "Done with function remove_bed_positions in: %s" %
-                 (after - prior) + "\n")
-            )
+            print(('\n' + "Done with function remove_bed_positions in: %s" %
+                  (after - prior) + "\n"))
 
         recalibrated_snp_matrix_intermediate.to_csv(
             compare_snp_matrix_recal_intermediate, sep="\t", index=False)
@@ -1298,10 +1186,8 @@ if __name__ == '__main__':
             compare_snp_matrix_recal_mpileup, sep='\t', index=False)
 
         after = datetime.datetime.now()
-        print(
-            ('\n' + "Done with function recalibrate_ddbb_vcf_intermediate in: %s" %
-             (after - prior) + "\n")
-        )
+        print(('\n' + "Done with function recalibrate_ddbb_vcf_intermediate in: %s" %
+              (after - prior) + "\n"))
 
         # Remove SNPs located within INDELs
 
@@ -1313,10 +1199,8 @@ if __name__ == '__main__':
             compare_snp_matrix_INDEL_intermediate, sep='\t', index=False)
 
         after = datetime.datetime.now()
-        print(
-            ("Done with function remove_position_range in: %s" %
-             (after - prior) + "\n")
-        )
+        print(("Done with function remove_position_range in: %s" %
+              (after - prior) + "\n"))
 
         # Extract all positions marked as complex
 
@@ -1327,10 +1211,8 @@ if __name__ == '__main__':
             (','.join([str(x) for x in complex_variants]))))
 
         after = datetime.datetime.now()
-        print(
-            ("Done with function extract_complex_list in: %s" %
-             (after - prior) + "\n")
-        )
+        print(("Done with function extract_complex_list in: %s" %
+              (after - prior) + "\n"))
 
         # Clean all faulty positions and samples for final table
 
@@ -1347,10 +1229,7 @@ if __name__ == '__main__':
             compare_snp_matrix_recal, sep='\t', index=False)
 
         after = datetime.datetime.now()
-        print(
-            ("Done with function revised_df in: %s" %
-             (after - prior) + "\n")
-        )
+        print(("Done with function revised_df in: %s" % (after - prior) + "\n"))
 
         # Matrix to pairwise and nwk
 
@@ -1359,22 +1238,13 @@ if __name__ == '__main__':
         ddtb_compare(compare_snp_matrix_recal, distance=5)
 
         after = datetime.datetime.now()
-        print(
-            ("Done with function ddtb_compare in: %s" %
-             (after - prior) + "\n")
-        )
+        print(("Done with function ddtb_compare in: %s" % (after - prior) + "\n"))
 
         logger.info('\n' + MAGENTA + BOLD + 'COMPARISON FINISHED IN GROUP: ' +
                     group_name + END_FORMATTING + '\n')
 
-        logger.info(
-            "\n"
-            + MAGENTA
-            + BOLD
-            + "##### END OF ONT VARIANT CALLING PIPELINE #####"
-            + "\n"
-            + END_FORMATTING
-        )
+        logger.info("\n" + MAGENTA + BOLD +
+                    "##### END OF ONT VARIANT CALLING PIPELINE #####" + "\n" + END_FORMATTING)
 
     else:
 
@@ -1384,19 +1254,10 @@ if __name__ == '__main__':
         ddtb_compare(compare_matrix, distance=args.distance)
 
         after = datetime.datetime.now()
-        print(
-            ("Done with function ddtb_compare in: %s" %
-             (after - prior) + "\n")
-        )
+        print(("Done with function ddtb_compare in: %s" % (after - prior) + "\n"))
 
         logger.info('\n' + MAGENTA + BOLD + 'COMPARISON FINISHED IN GROUP: ' +
                     group_name + END_FORMATTING + '\n')
 
-        logger.info(
-            "\n"
-            + MAGENTA
-            + BOLD
-            + "##### END OF ONT VARIANT CALLING PIPELINE #####"
-            + "\n"
-            + END_FORMATTING
-        )
+        logger.info("\n" + MAGENTA + BOLD +
+                    "##### END OF ONT VARIANT CALLING PIPELINE #####" + "\n" + END_FORMATTING)
