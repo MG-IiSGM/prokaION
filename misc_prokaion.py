@@ -1106,7 +1106,7 @@ def kraken(sample, report, kraken2_db, krona_html, threads=34):
     # print(cmd_kraken)
     execute_subprocess(cmd_kraken, isShell=True)
 
-    cmd_krona = "ImportTaxonomy.pl -m 3 -q 2 -t 5 {} -o {}".format(
+    cmd_krona = "ktImportTaxonomy -m 3 -q 2 -t 5 {} -o {}".format(
         report, krona_html)
 
     # print(cmd_krona)
