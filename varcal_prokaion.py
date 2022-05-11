@@ -140,10 +140,10 @@ def get_arguments():
         "Species determination", "Species databases")
 
     species_group.add_argument("--kraken2", dest="kraken2_db", type=str, default=False,
-                               required=False, help="REQUIRED. Kraken2 database")
+                               required=False, help="Kraken2 database")
 
     species_group.add_argument("--mash_db", dest="mash_db", type=str, required=False, default=False,
-                               help="REQUIRED. MASH NCBI annotation containing bacterial database")
+                               help="MASH NCBI annotation containing bacterial database")
 
     quality_group = parser.add_argument_group(
         "Quality parameters", "Parameters for diferent Quality conditions")
@@ -319,8 +319,6 @@ if __name__ == "__main__":
     group_name = output_dir.split("/")[-1]
     check_create_dir(output_dir)
     reference = os.path.abspath(args.reference)
-    kraken2_db = os.path.abspath(args.kraken2_db)
-    mash_db = os.path.abspath(args.mash_db)
 
     # Logging
     # Create log file with date and time
@@ -485,6 +483,9 @@ if __name__ == "__main__":
                         GREEN + "Species determination with Kraken2 for sample " + sample + END_FORMATTING)
                     kraken(HQ_filename, report, args.kraken2_db,
                            krona_html, threads=args.threads)
+            else:
+                logger.info(
+                    YELLOW + BOLD + "No Kraken database suplied, skipping specie assignation in group " + group_name + END_FORMATTING)
 
             # Species determination with mash and its bacterial database
 
@@ -504,6 +505,9 @@ if __name__ == "__main__":
                                                       'Identity', 'Share-hashes', 'Median-multiplicity', 'p-value', 'ID accession', 'Organism']).sort_values(by=['Identity'], ascending=False)
                     output_sort_species.to_csv(
                         mash_output, sep='\t', index=None)
+            else:
+                logger.info(
+                    YELLOW + BOLD + "No MASH database suplied, skipping specie assignation in group " + group_name + END_FORMATTING)
 
             after = datetime.datetime.now()
             print(("Done with function kraken & mash_screen in: %s" %
