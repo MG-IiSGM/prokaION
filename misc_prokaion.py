@@ -208,7 +208,7 @@ def file_to_list(file_name):
     return list_F
 
 
-def remove_low_quality(input_dir, output_dir, min_coverage=30, min_hq_snp=8, type_remove="Uncovered"):
+def remove_low_quality(input_dir, output_dir, mean_cov=20, min_coverage=30, min_hq_snp=8, type_remove="Uncovered"):
 
     right_now = str(datetime.datetime.now())
     right_now_full = "_".join(right_now.split(" "))
@@ -260,7 +260,7 @@ def remove_low_quality(input_dir, output_dir, min_coverage=30, min_hq_snp=8, typ
                     stats_df["HQ_SNP"] = stats_df["HQ_SNP"].astype(float)
 
                     # Store samples under any of the parameters indicated
-                    uncovered_samples = stats_df["#SAMPLE"][(stats_df["UNMAPPED_PROP"] >= min_coverage) | (
+                    uncovered_samples = stats_df["#SAMPLE"][(stats_df['MEAN_COV'] <= mean_cov) | (stats_df["UNMAPPED_PROP"] >= min_coverage) | (
                         stats_df["HQ_SNP"] < min_hq_snp)].tolist()
                     # print(uncovered_samples)
 
