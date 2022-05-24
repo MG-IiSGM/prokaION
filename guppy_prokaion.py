@@ -65,7 +65,7 @@ def get_arguments():
                         help="REQUIRED. Sample list for conversion from barcode to samples ID")
 
     parser.add_argument("-c", "--config", type=str, default="dna_r9.4.1_450bps_fast.cfg", required=False,
-                        help="REQUIRED. Config parameter for guppy_basecalling [fast|hac|sup]. Default: dna_r9.4.1_450bps_fast.cfg")
+                        help="REQUIRED. Config parameter for guppy_basecalling [fast|hac|sup]. Default: dna_r9.4.1_450bps_fast.cfg | dna_r10.4_e8.1_fast.cfg")
 
     parser.add_argument("-b", "--require_barcodes_both_ends", required=False, action="store_true",
                         help="Require barcodes at both ends. By default it only requires the barcode at one end for the sequences identification")
