@@ -746,7 +746,7 @@ if __name__ == "__main__":
                 group_name + END_FORMATTING)
 
     uncovered_samples = remove_low_quality(
-        input_dir, output_dir, min_coverage=args.coverage20, min_hq_snp=args.min_snp, type_remove="Uncovered")
+        input_dir, output_dir, mean_cov=20, min_coverage=args.coverage20, min_hq_snp=args.min_snp, type_remove="Uncovered")
 
     if len(uncovered_samples) > 1:
         logger.info(RED + BOLD + "Uncovered samples: " +
