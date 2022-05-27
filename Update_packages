@@ -1,0 +1,47 @@
+This is a file to update all the principal packages. 
+In each package it is necessary to assess which dependencies are updated and which are outdated and make a decision if it is worth.
+
+# Packages from guppy_prokaion.py
+
+## NanoPack
+
+pip install nanopack --upgrade
+
+# Packages from varcal_prokaion.py
+
+## Minimap2
+
+conda install -c bioconda -c conda-forge -c defaults -c r minimap2
+
+## Samtools
+
+conda install -c bioconda -c conda-forge -c defaults -c r samtools
+
+## Freebayes
+
+conda install -c bioconda -c conda-forge -c defaults -c r freebayes
+
+## BCFtools
+
+conda install -c bioconda -c conda-forge -c defaults -c r bcftools
+
+## Snippy
+
+conda install -c bioconda -c conda-forge -c defaults -c r snippy
+
+# Packages from misc_prokaion.py
+
+## Infoseq
+
+conda install -c bioconda -c conda-forge -c defaults -c r infoseq
+
+## SNPEff
+
+conda install -c bioconda -c conda-forge -c defaults -c r snpeff
+
+## Databases
+
+conda install -c bioconda -c conda-forge -c defaults -c r blast
+conda install -c bioconda -c conda-forge -c defaults -c r kraken2
+conda install -c bioconda -c conda-forge -c defaults -c r krona
+conda install -c bioconda -c conda-forge -c defaults -c r mash
