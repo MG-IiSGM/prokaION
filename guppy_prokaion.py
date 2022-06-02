@@ -70,40 +70,46 @@ def get_arguments():
     parser.add_argument("-b", "--require_barcodes_both_ends", required=False, action="store_true",
                         help="Require barcodes at both ends. By default it only requires the barcode at one end for the sequences identification")
 
-    parser.add_argument("--kit", type=str, required=False,
-                        default="SQK-LSK109", help="Kit to find a configuration for")
-
     parser.add_argument("--barcode_kit", type=str, required=False, default="EXP-NBD104",
                         help="Kit of barcodes used [EXP-NBD104|SQK-RBK110-96|EXP-NBD196]. Default: EXP-NBD104")
+
+    parser.add_argument('-g', '--gpu', type=int, dest='gpu', required=False,
+                        default=8, help='Number of runners per GPU device. Default: 8')
 
     parser.add_argument("-t", "--threads", type=int, dest="threads", required=False,
                         default=30, help="Threads to use (30 threads by default)")
 
     parser.add_argument("--num_callers", type=int, dest="num_callers",
-                        required=False, default=3, help="Number of parallel basecallers")
+                        required=False, default=14, help="Number of parallel basecallers")
+
+    parser.add_argument('--chunks', type=int, dest='chunks',
+                        required=False, default=1536, help='Maximum chunks per runner. Default: 1536')
 
     parser.add_argument("--records_per_fastq", type=int, dest="records_per_fastq",
                         required=False, default=0, help="Maximum number of records per fastq")
+
+    parser.add_argument("-q", "--min_base_quality", type=int, dest="min_quality", required=False,
+                        default=10, help="Filter on a minimum average read quality score. Default: 10")
 
     arguments = parser.parse_args()
 
     return arguments
 
 
-def basecalling_ion(input_dir, out_basecalling_dir, config="dna_r9.4.1_450bps_fast.cfg", callers=3, chunks=2048, threads=10, records=0):
+def basecalling_ion(input_dir, out_basecalling_dir, config='dna_r9.4.1_450bps_fast.cfg', callers=3, chunks=2048, threads=10, records=0):
 
     # -i: Path to input fast5 files
     # -s: Path to save fastq files
     # -c: Config file to use > https://community.nanoporetech.com/posts/guppy-v5-0-7-release-note (fast // hac // sup)
-    # --kit: Kit to find a configuration for
     # --num_callers: Number of parallel basecallers to Basecaller, if supplied will form part
+    # --gpu_runners_per_device: Number of runners per GPU device.
     # --cpu_threads_per_caller: Number of CPU worker threads per basecaller
     # --chunks_per_runner: Maximum chunks per runner
     # --compress_fastq: Compress fastq output files with gzip
     # --records_per_fastq: Maximum number of records per fastq file, 0 means use a single file (per worker, per run id)
 
-    cmd = ["guppy_basecaller", "-i", input_dir, "-s", out_basecalling_dir, "-c", config, "--num_callers",
-           str(callers), "--chunks_per_runner", str(chunks), "--cpu_threads_per_caller", str(threads), "--records_per_fastq", str(records), "--compress_fastq"]
+    cmd = ['guppy_basecaller', '-i', input_dir, '-s', out_basecalling_dir, '-c', config, '--num_callers',
+           str(callers), '--chunks_per_runner', str(chunks), '--cpu_threads_per_caller', str(threads), '--records_per_fastq', str(records), '--compress_fastq']
 
     print(cmd)
     execute_subprocess(cmd, isShell=False)
@@ -174,8 +180,8 @@ def ONT_QC_filtering(output_samples, filtered_samples):
     # -c: Write on standard output, keep the original files unchanged
     # -q: Filter on a minimum average read quality score
 
-    cmd_filtering = "gunzip -c {} | NanoFilt -q {} --length {} --maxlength {} | gzip > {}".format(
-        output_samples, str(args.min_quality), str(200), str(600), filtered_samples)
+    cmd_filtering = "gunzip -c {} | NanoFilt -q {} | gzip > {}".format(
+        output_samples, str(args.min_quality), filtered_samples)
 
     # print(cmd_filtering)
     execute_subprocess(cmd_filtering, isShell=True)
