@@ -89,7 +89,7 @@ def get_arguments():
                         required=False, default=0, help="Maximum number of records per fastq")
 
     parser.add_argument("-q", "--min_base_quality", type=int, dest="min_quality", required=False,
-                        default=10, help="Filter on a minimum average read quality score. Default: 10")
+                        default=8, help="Filter on a minimum average read quality score. Default: 8")
 
     arguments = parser.parse_args()
 
