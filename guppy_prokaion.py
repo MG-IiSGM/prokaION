@@ -73,14 +73,14 @@ def get_arguments():
     parser.add_argument("--barcode_kit", type=str, required=False, default="EXP-NBD104",
                         help="Kit of barcodes used [EXP-NBD104|SQK-RBK110-96|EXP-NBD196]. Default: EXP-NBD104")
 
-    parser.add_argument('-g', '--gpu', type=int, dest='gpu', required=False,
-                        default=8, help='Number of runners per GPU device. Default: 8')
+    parser.add_argument('-g', '--gpu', required=False, default=False,
+                        action="store_true", help='Specify GPU device: "auto", or "cuda:<device_id>"')
 
     parser.add_argument("-t", "--threads", type=int, dest="threads", required=False,
-                        default=30, help="Threads to use (30 threads by default)")
+                        default=30, help="Threads to use. Default: 30)")
 
     parser.add_argument("--num_callers", type=int, dest="num_callers",
-                        required=False, default=14, help="Number of parallel basecallers")
+                        required=False, default=8, help="Number of parallel basecallers. Default: 8")
 
     parser.add_argument('--chunks', type=int, dest='chunks',
                         required=False, default=1536, help='Maximum chunks per runner. Default: 1536')
@@ -96,11 +96,12 @@ def get_arguments():
     return arguments
 
 
-def basecalling_ion(input_dir, out_basecalling_dir, config='dna_r9.4.1_450bps_fast.cfg', callers=3, chunks=2048, threads=10, records=0):
+def basecalling_ion(input_dir, out_basecalling_dir, config='dna_r9.4.1_450bps_fast.cfg', records=0):
 
     # -i: Path to input fast5 files
     # -s: Path to save fastq files
     # -c: Config file to use > https://community.nanoporetech.com/posts/guppy-v5-0-7-release-note (fast // hac // sup)
+    # -x: Specify GPU device: 'auto', or 'cuda:<device_id>'
     # --num_callers: Number of parallel basecallers to Basecaller, if supplied will form part
     # --gpu_runners_per_device: Number of runners per GPU device.
     # --cpu_threads_per_caller: Number of CPU worker threads per basecaller
@@ -108,20 +109,23 @@ def basecalling_ion(input_dir, out_basecalling_dir, config='dna_r9.4.1_450bps_fa
     # --compress_fastq: Compress fastq output files with gzip
     # --records_per_fastq: Maximum number of records per fastq file, 0 means use a single file (per worker, per run id)
 
-    cmd = ['guppy_basecaller', '-i', input_dir, '-s', out_basecalling_dir, '-c', config, '--num_callers',
-           str(callers), '--chunks_per_runner', str(chunks), '--cpu_threads_per_caller', str(threads), '--records_per_fastq', str(records), '--compress_fastq']
+    if args.gpu != False:
+        logger.info(
+            GREEN + 'Basecalling executing on GPU device' + END_FORMATTING)
+        gpu_device = "auto"
+        cmd = ['guppy_basecaller', '-i', input_dir, '-s', out_basecalling_dir, '-c',
+               config, '-x', gpu_device, '--records_per_fastq', str(records), '--compress_fastq']
+    else:
+        logger.info(
+            YELLOW + 'Basecalling executing on CPU device' + END_FORMATTING)
+        cmd = ['guppy_basecaller', '-i', input_dir, '-s', out_basecalling_dir, '-c', config, '--num_callers', str(args.num_callers), '--chunks_per_runner', str(
+            args.chunks), '--cpu_threads_per_caller', str(args.threads), '--records_per_fastq', str(records), '--compress_fastq']
 
     print(cmd)
     execute_subprocess(cmd, isShell=False)
 
 
-def barcoding_ion(
-    out_basecalling_dir,
-    out_barcoding_dir,
-    require_barcodes_both_ends=False,
-    barcode_kit="EXP-NBD104",
-    threads=30,
-):
+def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_ends=False, barcode_kit="EXP-NBD104", threads=30):
 
     # -i: Path to input files
     # -r: Search for input file recursively
@@ -278,14 +282,14 @@ if __name__ == "__main__":
 
     prior = datetime.datetime.now()
 
-    logger.info("\n" + GREEN + "STARTING BASECALLING" + END_FORMATTING)
+    logger.info("\n" + GREEN + BOLD + "STARTING BASECALLING" + END_FORMATTING)
 
     if os.path.isfile(basecalling_summary):
         logger.info("\n" + YELLOW + BOLD +
                     "Ommiting BASECALLING" + END_FORMATTING + "\n")
     else:
-        basecalling_ion(input_dir, out_basecalling_dir, config=args.config, callers=args.num_callers,
-                        chunks=2048, threads=args.threads, records=args.records_per_fastq)
+        basecalling_ion(input_dir, out_basecalling_dir,
+                        config=args.config, records=args.records_per_fastq)
 
     after = datetime.datetime.now()
     print(("Done with function basecalling_ion in: %s" % (after - prior) + "\n"))
@@ -294,7 +298,7 @@ if __name__ == "__main__":
 
     prior = datetime.datetime.now()
 
-    logger.info("\n" + GREEN + "STARTING BARCODING" + END_FORMATTING)
+    logger.info("\n" + GREEN + BOLD + "STARTING BARCODING" + END_FORMATTING)
 
     if os.path.isfile(barcoding_summary):
         logger.info("\n" + YELLOW + BOLD +
