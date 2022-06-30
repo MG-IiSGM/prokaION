@@ -116,7 +116,7 @@ def get_arguments():
                                default=0.2, help="Minimum fraction of observations supporting an alternate allele. Default: 0.2")
 
     variant_group.add_argument("-q", "--min_base_quality", type=int, dest="min_quality", required=False,
-                               default=10, help="Exclude alleles from analysis below threshold. Default: 10")
+                               default=12, help="Exclude alleles from analysis below threshold. Default: 12")
 
     variant_group.add_argument("-m", "--min_mapping_quality", type=int, dest="min_mapping", required=False,
                                default=60, help="Exclude alignments from analysis below threshold. Default: 60")
@@ -188,19 +188,19 @@ def get_arguments():
                                default=0.6, help="Minimum uncovered genome to discard a sample. Default: 0.6")
 
     compare_group.add_argument("--min_threshold_discard_uncov_pos", required=False,
-                               type=float, default=0.5, help="Minimum covered position to discard it. Default: 0.6")
+                               type=float, default=0.5, help="Minimum covered position to discard it. Default: 0.5")
 
     compare_group.add_argument("--min_threshold_discard_htz_sample", required=False, type=float,
                                default=0.6, help="Minimum heterozygosity to discard a sample. Default: 0.6")
 
     compare_group.add_argument("--min_threshold_discard_htz_pos", required=False, type=float,
-                               default=0.5, help="Minimum heterozygosity to discard a position. Default: 0.6")
+                               default=0.5, help="Minimum heterozygosity to discard a position. Default: 0.5")
 
     compare_group.add_argument("--min_threshold_discard_all_sample", required=False, type=float,
                                default=0.6, help="Minimum inaccuracies to discard a sample. Default: 0.6")
 
     compare_group.add_argument("--min_threshold_discard_all_pos", required=False, type=float,
-                               default=0.5, help="Minimum inaccuracies to discard a position. Default: 0.6")
+                               default=0.5, help="Minimum inaccuracies to discard a position. Default: 0.5")
 
     output_group = parser.add_argument_group(
         "Output", "Required parameter to output results")
@@ -967,7 +967,7 @@ if __name__ == "__main__":
 
     prior = datetime.datetime.now()
 
-    recalibrated_revised_INDEL_df = revised_df(compare_snp_matrix_INDEL_intermediate_df, path_compare, complex_pos=complex_variants, min_freq_include=0.8, min_threshold_discard_uncov_sample=args.min_threshold_discard_uncov_sample, min_threshold_discard_uncov_pos=args.min_threshold_discard_uncov_pos, min_threshold_discard_htz_sample=args.min_threshold_discard_htz_sample,
+    recalibrated_revised_INDEL_df = revised_df(compare_snp_matrix_INDEL_intermediate_df, path_compare, complex_pos=complex_variants, min_freq_include=0.7, min_threshold_discard_uncov_sample=args.min_threshold_discard_uncov_sample, min_threshold_discard_uncov_pos=args.min_threshold_discard_uncov_pos, min_threshold_discard_htz_sample=args.min_threshold_discard_htz_sample,
                                                min_threshold_discard_htz_pos=args.min_threshold_discard_htz_pos, min_threshold_discard_all_pos=args.min_threshold_discard_all_pos, min_threshold_discard_all_sample=args.min_threshold_discard_all_sample, remove_faulty=True, drop_samples=True, drop_positions=True, windows_size_discard=args.window)
     recalibrated_revised_INDEL_df.to_csv(
         compare_snp_matrix_recal, sep='\t', index=False)
