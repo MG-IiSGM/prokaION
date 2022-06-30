@@ -609,7 +609,7 @@ def add_window_distance(vcf_df, window_size=10):
                     vcf_df.loc[index, df_header] = len(num_conglomerate)
 
 
-def revised_df(df, out_dir=False, complex_pos=False, min_freq_include=0.8, min_threshold_discard_uncov_sample=0.6, min_threshold_discard_uncov_pos=0.6, min_threshold_discard_htz_sample=0.6, min_threshold_discard_htz_pos=0.6, min_threshold_discard_all_pos=0.6, min_threshold_discard_all_sample=0.6, remove_faulty=True, drop_samples=True, drop_positions=True, windows_size_discard=2):
+def revised_df(df, out_dir=False, complex_pos=False, min_freq_include=0.7, min_threshold_discard_uncov_sample=0.6, min_threshold_discard_uncov_pos=0.5, min_threshold_discard_htz_sample=0.6, min_threshold_discard_htz_pos=0.5, min_threshold_discard_all_pos=0.5, min_threshold_discard_all_sample=0.6, remove_faulty=True, drop_samples=True, drop_positions=True, windows_size_discard=2):
 
     if remove_faulty == True:
 
@@ -1152,7 +1152,7 @@ if __name__ == '__main__':
         prior = datetime.datetime.now()
 
         recalibrated_snp_matrix_intermediate = ddbb_create_intermediate(
-            out_variant_dir, out_stats_coverage_dir, min_freq_discard=0.1, min_alt_dp=10, only_snp=False, samples=sample_list)
+            out_variant_dir, out_stats_coverage_dir, min_freq_discard=0.2, min_alt_dp=10, only_snp=False, samples=sample_list)
         # recalibrated_snp_matrix_intermediate.to_csv(
         #     compare_snp_matrix_recal_intermediate, sep='\t', index=False)
 
@@ -1223,7 +1223,7 @@ if __name__ == '__main__':
         else:
             remove_complex_positions = False
 
-        recalibrated_revised_INDEL_df = revised_df(compare_snp_matrix_INDEL_intermediate_df, path_compare, complex_pos=remove_complex_positions, min_freq_include=0.8, min_threshold_discard_uncov_sample=args.min_threshold_discard_uncov_sample, min_threshold_discard_uncov_pos=args.min_threshold_discard_uncov_pos, min_threshold_discard_htz_sample=args.min_threshold_discard_htz_sample,
+        recalibrated_revised_INDEL_df = revised_df(compare_snp_matrix_INDEL_intermediate_df, path_compare, complex_pos=remove_complex_positions, min_freq_include=0.7, min_threshold_discard_uncov_sample=args.min_threshold_discard_uncov_sample, min_threshold_discard_uncov_pos=args.min_threshold_discard_uncov_pos, min_threshold_discard_htz_sample=args.min_threshold_discard_htz_sample,
                                                    min_threshold_discard_htz_pos=args.min_threshold_discard_htz_pos, min_threshold_discard_all_pos=args.min_threshold_discard_all_pos, min_threshold_discard_all_sample=args.min_threshold_discard_all_sample, remove_faulty=True, drop_samples=True, drop_positions=True, windows_size_discard=args.window)
         recalibrated_revised_INDEL_df.to_csv(
             compare_snp_matrix_recal, sep='\t', index=False)
