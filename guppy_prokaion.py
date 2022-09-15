@@ -144,7 +144,7 @@ def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_
     # --records_per_fastq: Maximum number of records per fastq file, 0 means use a single file (per worker, per run id)
     # --allow_inferior_barcodes: Reads will still be classified even if both the barcodes at the front and rear (if applicable) were not the best scoring barcodes above the min_score.
 
-    # --trim_barcodes: Trim the barcodes from the sequences in the output files.
+    # --trim_barcodes: Trim the barcodes from the sequences in the output files. > --disable_trim_barcodes
     # --trim_adapters: Trim the adapters from the sequences in the output files.
     # --trim_primers: Trim the primers from the sequences in the output files.
     # --detect_barcodes: Detect barcode sequences at the front and rear of the read.
@@ -164,7 +164,7 @@ def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_
         require_barcodes_both_ends = ""
 
     cmd = ["guppy_barcoder", "-i", out_basecalling_dir, "-s", out_barcoding_dir, "-r", require_barcodes_both_ends,
-           "--barcode_kits", barcode_kit, "-t", str(threads), '--detect_barcodes', '--trim_barcodes', "--fastq_out", "--compress_fastq"]
+           "--barcode_kits", barcode_kit, "-t", str(threads), '--detect_barcodes', '--detect_primer', '--trim_primers', '--detect_adapter', '--trim_adapters', "--fastq_out", "--compress_fastq"]
 
     print(cmd)
     execute_subprocess(cmd, isShell=False)
