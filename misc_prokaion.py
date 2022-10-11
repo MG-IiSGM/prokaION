@@ -1053,6 +1053,7 @@ def annotate_aa(annot_file, aas):
         dfaa = pd.read_csv(aa, sep="\t", names=["aa", "annot"])
         if not header in df.columns:
             logger.info("ANNOTATING AA: {}".format(aa))
+            df['HGVS.p'] = df['HGVS.p'].astype(str)
             df[header] = df.apply(lambda x: checkAA(x["HGVS.p"], dfaa), axis=1)
         else:
             logger.info("SKIPPED AA: {}".format(aa))

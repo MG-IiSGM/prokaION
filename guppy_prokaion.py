@@ -61,8 +61,8 @@ def get_arguments():
     parser.add_argument("-o", "--output", type=str, required=True,
                         help="REQUIRED. Output directory to extract all results")
 
-    parser.add_argument("-s", "--samples", metavar="Samples", type=str, required=True,
-                        help="REQUIRED. Sample list for conversion from barcode to samples ID")
+    parser.add_argument("-s", "--samples", metavar="Samples", type=str, required=False,
+                        help="Sample list for conversion from barcode to samples ID")
 
     parser.add_argument("-c", "--config", type=str, default="dna_r9.4.1_450bps_fast.cfg", required=False,
                         help="REQUIRED. Config parameter for guppy_basecalling [fast|hac|sup]. Default: dna_r9.4.1_450bps_fast.cfg | dna_r10.4_e8.1_fast.cfg")
