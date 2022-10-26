@@ -148,7 +148,7 @@ def extract_read_list(input_dir):
         if root == input_dir:  # This only apply to parent folder, not subdirectories
             for name in files:
                 filename = os.path.join(root, name)
-                is_files = re.match(r".*\.f(ast)*[aq5](\.gz)*", name)
+                is_files = re.match(r".*\.f(ast)*[q5](\.gz)*", name)
                 if is_files:
                     all_files.append(filename)
 
