@@ -12,11 +12,7 @@ import gzip
 # Local application imports
 
 from misc_prokaion import (
-    check_create_dir,
-    extract_read_list,
-    extract_sample_list,
-    execute_subprocess,
-)
+    check_create_dir, extract_read_list, extract_sample_list, execute_subprocess)
 
 
 logger = logging.getLogger()

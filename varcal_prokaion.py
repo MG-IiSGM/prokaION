@@ -11,46 +11,13 @@ import gzip
 import multiprocessing
 import pandas as pd
 
-
 # Local application imports
 
-from misc_prokaion import (
-    check_create_dir,
-    check_file_exists,
-    extract_read_list,
-    extract_sample_list,
-    execute_subprocess,
-    check_reanalysis,
-    file_to_list,
-    samtools_faidx,
-    create_reference_chunks,
-    extract_indels,
-    merge_vcf,
-    vcf_to_ivar_tsv,
-    create_bamstat,
-    create_coverage,
-    obtain_group_cov_stats,
-    obtain_overal_stats,
-    ivar_consensus,
-    replace_consensus_header,
-    remove_low_quality,
-    rename_reference_snpeff,
-    annotate_snpeff,
-    user_annotation,
-    user_annotation_aa,
-    make_blast,
-    kraken,
-    mash_screen)
+from misc_prokaion import (check_create_dir, check_file_exists, extract_read_list, extract_sample_list, execute_subprocess, check_reanalysis, file_to_list, samtools_faidx, create_reference_chunks, extract_indels, merge_vcf, vcf_to_ivar_tsv, create_bamstat,
+                           create_coverage, obtain_group_cov_stats, obtain_overal_stats, ivar_consensus, replace_consensus_header, remove_low_quality, rename_reference_snpeff, annotate_snpeff, user_annotation, user_annotation_aa, make_blast, kraken, mash_screen)
 
-from compare_snp_prokaion import (
-    ddbb_create_intermediate,
-    recalibrate_ddbb_vcf_intermediate,
-    remove_position_range,
-    extract_complex_list,
-    revised_df,
-    ddtb_compare,
-    remove_bed_positions
-)
+from compare_snp_prokaion import (ddbb_create_intermediate, recalibrate_ddbb_vcf_intermediate,
+                                  remove_position_range, extract_complex_list, revised_df, ddtb_compare, remove_bed_positions)
 
 
 logger = logging.getLogger()
@@ -99,9 +66,6 @@ def get_arguments():
 
     input_group.add_argument("-L", "--sample_list", type=str, required=False,
                              help="Sample names to analyse only in the file supplied")
-
-    input_group.add_argument("-p", "--primers", type=str,
-                             required=False, help="Bed file including primers to trim")
 
     input_group.add_argument("-t", "--threads", type=int, dest="threads",
                              required=False, default=36, help="Threads to use (36 threads by default)")
@@ -152,7 +116,7 @@ def get_arguments():
                                help="Minimum percentage of coverage at 20X to clasify as uncovered. Default: 50")
 
     quality_group.add_argument("-n", "--min_snp", type=int, required=False,
-                               default=75, help="SNP number to pass quality threshold. Default: 30 HQ SNP")
+                               default=75, help="SNP number to pass quality threshold. Default: 75 HQ SNP")
 
     annotation_group = parser.add_argument_group(
         "Annotation", "Parameters for Variant Annotation")
@@ -313,8 +277,6 @@ if __name__ == "__main__":
     args = get_arguments()
 
     input_dir = os.path.abspath(args.input_dir)
-    # in_samples_filtered_dir = os.path.join(
-    #     input_dir, "Samples_Fastq/Filtered_Fastq")
     output_dir = os.path.abspath(args.output)
     group_name = output_dir.split("/")[-1]
     check_create_dir(output_dir)
@@ -349,6 +311,7 @@ if __name__ == "__main__":
 
     logger.info(
         "\n" + BLUE + "############### START VARIANT CALLING ###############" + END_FORMATTING + "\n")
+
     logger.info(args)
 
     # Obtain all fastq files from folder
@@ -465,7 +428,7 @@ if __name__ == "__main__":
 
             prior = datetime.datetime.now()
 
-            # Species determination with kraken2 and its standard database and visualization with ImportTaxonomy.pl from kronatools kit
+            # Species determination with kraken2 and its standard database and visualization with ktImportTaxonomy from kronatools kit
 
             sample_species_dir = os.path.join(out_species_dir, sample)
             # print(sample_species_dir)
