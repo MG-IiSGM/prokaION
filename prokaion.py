@@ -150,7 +150,7 @@ def get_arguments():
     variant_group = parser.add_argument_group(
         "Variant Calling", "Variant Calling parameters")
 
-    variant_group.add_argument("-f", "--min_allele_frequency", type=int, dest="min_allele", required=False,
+    variant_group.add_argument("-f", "--min_allele_frequency", type=int, dest="min_allele_frequency", required=False,
                                default=0.2, help="Minimum fraction of observations supporting an alternate allele. Default: 0.2")
 
     variant_group.add_argument("-q", "--min_base_quality", type=int, dest="min_quality", required=False,
