@@ -87,6 +87,9 @@ def get_arguments():
     parser.add_argument("-q", "--min_base_quality", type=int, dest="min_quality", required=False,
                         default=8, help="Filter on a minimum average read quality score. Default: 8")
 
+    parser.add_argument("--length", type=int, dest="length", required=False,
+                        default=500, help="Filter on a minimum read length. Default: 500bp")
+
     parser.add_argument("--headcrop", type=int, dest="headcrop", required=False,
                         default=20, help="Trim n nucleotides from start of read. Default: 20")
 
@@ -185,9 +188,12 @@ def ONT_QC_filtering(output_samples, filtered_samples):
 
     # -c: Write on standard output, keep the original files unchanged
     # -q: Filter on a minimum average read quality score
+    # --length: Filter on a minimum read length
+    # --headcrop: Trim n nucleotides from start of read
+    # --tailcrop: Trim n nucleotides from end of read
 
-    cmd_filtering = "gunzip -c {} | NanoFilt -q {} --headcrop {} --tailcrop {} | gzip > {}".format(
-        output_samples, str(args.min_quality), str(args.headcrop), str(args.tailcrop), filtered_samples)
+    cmd_filtering = "gunzip -c {} | NanoFilt -q {} --length {} --headcrop {} --tailcrop {} | gzip > {}".format(
+        output_samples, str(args.min_quality), str(args.length), str(args.headcrop), str(args.tailcrop), filtered_samples)
 
     # print(cmd_filtering)
     execute_subprocess(cmd_filtering, isShell=True)
