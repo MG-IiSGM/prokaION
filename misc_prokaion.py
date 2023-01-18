@@ -208,7 +208,7 @@ def file_to_list(file_name):
     return list_F
 
 
-def remove_low_quality(input_dir, output_dir, mean_cov=20, min_coverage=30, min_hq_snp=8, type_remove="Uncovered"):
+def remove_low_quality(input_dir, output_dir, mean_cov=20, unmapped_per=50, min_hq_snp=8, type_remove="Uncovered"):
 
     right_now = str(datetime.datetime.now())
     right_now_full = "_".join(right_now.split(" "))
@@ -260,7 +260,7 @@ def remove_low_quality(input_dir, output_dir, mean_cov=20, min_coverage=30, min_
                     stats_df["HQ_SNP"] = stats_df["HQ_SNP"].astype(float)
 
                     # Store samples under any of the parameters indicated
-                    uncovered_samples = stats_df["#SAMPLE"][(stats_df['MEAN_COV'] <= mean_cov) | (stats_df["UNMAPPED_PROP"] >= min_coverage) | (
+                    uncovered_samples = stats_df["#SAMPLE"][(stats_df['MEAN_COV'] <= mean_cov) | (stats_df["UNMAPPED_PROP"] >= unmapped_per) | (
                         stats_df["HQ_SNP"] < min_hq_snp)].tolist()
                     # print(uncovered_samples)
 
@@ -308,7 +308,7 @@ def remove_low_quality(input_dir, output_dir, mean_cov=20, min_coverage=30, min_
 
     # print(sample_list_F)
 
-    # # MOVE Fastq
+    # MOVE Fastq
     if len(uncovered_samples) > 0:
         for uncovered_sample in uncovered_samples:
             try:
@@ -344,7 +344,6 @@ def remove_low_quality(input_dir, output_dir, mean_cov=20, min_coverage=30, min_
                             "{} already exist".format(destination_file))
 
     # Move Bam, Consensus and Stats files to Uncovered folder
-
     for outdir, uncovdir in zip(folder_list, uncovered_folder_list[1:]):
         for root, _, files in os.walk(outdir):
             # print(root)

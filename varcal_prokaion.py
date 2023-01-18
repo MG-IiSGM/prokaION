@@ -112,8 +112,11 @@ def get_arguments():
     quality_group = parser.add_argument_group(
         "Quality parameters", "Parameters for diferent Quality conditions")
 
-    quality_group.add_argument("-c", "--coverage20", type=int, default=50, required=False,
-                               help="Minimum percentage of coverage at 20X to clasify as uncovered. Default: 50")
+    quality_group.add_argument('-c', '--coverage20', type=int, default=20, required=False,
+                               help='Minimum percentage of coverage at 20x to classify as uncovered. Default: 20')
+
+    quality_group.add_argument('-u', '--unmapped', type=int, default=50, required=False,
+                               help='Minimum percentage of unmapped reads to classify as uncovered. Default: 50')
 
     quality_group.add_argument("-n", "--min_snp", type=int, required=False,
                                default=75, help="SNP number to pass quality threshold. Default: 75 HQ SNP")
@@ -709,7 +712,7 @@ if __name__ == "__main__":
                 group_name + END_FORMATTING)
 
     uncovered_samples = remove_low_quality(
-        input_dir, output_dir, mean_cov=20, min_coverage=args.coverage20, min_hq_snp=args.min_snp, type_remove="Uncovered")
+        output_dir, output_dir, mean_cov=args.coverage20, unmapped_per=args.unmapped, min_hq_snp=args.min_snp, type_remove="Uncovered")
 
     if len(uncovered_samples) > 1:
         logger.info(RED + BOLD + "Uncovered samples: " +
