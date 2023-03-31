@@ -1,4 +1,4 @@
-This is a file to update all the principal packages. 
+This is a file to update all the principal packages.
 In each package it is necessary to assess which dependencies are updated and which are outdated and make a decision if it is worth.
 
 # Packages from guppy_prokaion.py
@@ -33,7 +33,7 @@ conda install -c bioconda -c conda-forge -c defaults -c r snippy
 
 ## Infoseq
 
-conda install -c bioconda -c conda-forge -c defaults -c r infoseq
+conda install -c bioconda -c conda-forge -c defaults -c r emboss
 
 ## SNPEff
 

@@ -124,7 +124,7 @@ def check_file_exists(file_name):
     return os.path.isfile(file_name)
 
 
-def import_tsv_variants(tsv_file, sample, min_total_depth=4, min_alt_dp=7, only_snp=True):
+def import_tsv_variants(tsv_file, sample, min_total_depth=8, min_alt_dp=8, only_snp=True):
 
     input_file = os.path.abspath(tsv_file)
 
@@ -156,7 +156,7 @@ def import_to_pandas(file_table, header=False, sep='\t'):
     return dataframe
 
 
-def extract_lowfreq(tsv_file, sample, min_total_depth=4, min_alt_dp=4, min_freq_include=0.7, only_snp=True):
+def extract_lowfreq(tsv_file, sample, min_total_depth=8, min_alt_dp=8, min_freq_include=0.7, only_snp=True):
 
     input_file = os.path.abspath(tsv_file)
 
@@ -191,7 +191,7 @@ def extract_uncovered(cov_file):
     return df
 
 
-def ddbb_create_intermediate(variant_dir, coverage_dir, min_freq_discard=0.1, min_alt_dp=7, only_snp=False, samples=False):
+def ddbb_create_intermediate(variant_dir, coverage_dir, min_freq_discard=0.1, min_alt_dp=8, only_snp=False, samples=False):
 
     df = pd.DataFrame(columns=["REGION", "POS", "REF", "ALT"])
 
@@ -204,14 +204,14 @@ def ddbb_create_intermediate(variant_dir, coverage_dir, min_freq_discard=0.1, mi
                     logger.debug("Adding: " + sample)
                     filename = os.path.join(root, name)
                     dfv = import_tsv_variants(
-                        filename, sample, min_total_depth=4, min_alt_dp=4, only_snp=only_snp)
+                        filename, sample, min_total_depth=8, min_alt_dp=8, only_snp=only_snp)
                     df = df.merge(dfv, how="outer")
                 else:
                     if sample in samples:
                         logger.debug("Adding: " + sample)
                         filename = os.path.join(root, name)
                         dfv = import_tsv_variants(
-                            filename, sample, min_total_depth=4, min_alt_dp=4, only_snp=only_snp)
+                            filename, sample, min_total_depth=8, min_alt_dp=8, only_snp=only_snp)
                         if dfv.shape[0] > 0:
                             df = df.merge(dfv, how="outer")
                         else:
@@ -240,14 +240,14 @@ def ddbb_create_intermediate(variant_dir, coverage_dir, min_freq_discard=0.1, mi
                 if samples == False:
                     logger.debug('Adding lowfreqs: ' + sample)
                     dfl = extract_lowfreq(
-                        filename, sample, min_total_depth=4, min_alt_dp=min_alt_dp, only_snp=only_snp)
+                        filename, sample, min_total_depth=8, min_alt_dp=min_alt_dp, only_snp=only_snp)
                     df[sample].update(df[['REGION', 'POS', 'REF', 'ALT']].merge(
                         dfl, on=['REGION', 'POS', 'REF', 'ALT'], how='left')[sample])
                 else:
                     if sample in samples:
                         logger.debug('Adding lowfreqs: ' + sample)
                         dfl = extract_lowfreq(
-                            filename, sample, min_total_depth=4, min_alt_dp=min_alt_dp, only_snp=only_snp)
+                            filename, sample, min_total_depth=8, min_alt_dp=min_alt_dp, only_snp=only_snp)
                         df[sample].update(df[['REGION', 'POS', 'REF', 'ALT']].merge(
                             dfl, on=['REGION', 'POS', 'REF', 'ALT'], how='left')[sample])
 
@@ -350,14 +350,28 @@ def bed_to_df(bed_file):
     return df
 
 
-def remove_bed_positions(df, bed_file):
+def remove_bed_positions(df, bed_file, path_compare):
     bed_df = bed_to_df(bed_file)
+    filtered_position = path_compare + ".filter_position.tsv"
+
+    counter = 0
+
     for _, row in df.iterrows():
         position_number = int(row.Position.split("|")[2])
         if any(start <= position_number <= end for (start, end) in zip(bed_df.start.values.tolist(), bed_df.end.values.tolist())):
             logger.info('Position: {} removed found in {}'.format(
                 row.Position, bed_file))
+            if counter == 0:
+                df_filter = df[df.Position == row.Position]
+            else:
+                df_aux = df[df.Position == row.Position]
+                df_filter = df_filter.append(df_aux, ignore_index=True)
             df = df[df.Position != row.Position]
+            counter += 1
+
+    if counter:
+        df_filter.to_csv(filtered_position, sep="\t", index=False)
+
     return df
 
 
@@ -619,7 +633,7 @@ def revised_df(df, out_dir=False, complex_pos=False, min_freq_include=0.7, min_t
             i) < min_freq_include) and (float(i) > 0.1) for i in x.values])/sum([(i not in [0, '0']) for i in x.values]), axis=1)
 
         report_position = pd.DataFrame({'Position': df.Position, 'uncov_fract': uncovered_positions,
-                                       'htz_frac': heterozygous_positions, 'faulty_frac': uncovered_positions + heterozygous_positions})
+                                        'htz_frac': heterozygous_positions, 'faulty_frac': uncovered_positions + heterozygous_positions})
         faulty_positions = report_position['Position'][(report_position.uncov_fract >= min_threshold_discard_uncov_pos) | (
             report_position.htz_frac >= min_threshold_discard_htz_pos) | (report_position.faulty_frac >= min_threshold_discard_all_pos)].tolist()
 
@@ -628,7 +642,7 @@ def revised_df(df, out_dir=False, complex_pos=False, min_freq_include=0.7, min_t
         heterozygous_samples = df.iloc[:, 3:].apply(lambda x: sum([(i not in ['!', '?', 0, 1, '0', '1']) and (float(
             i) < min_freq_include) and (float(i) > 0.1) for i in x.values])/sum([(i not in [0, '0']) for i in x.values]), axis=0)
         report_samples = pd.DataFrame({'sample': df.iloc[:, 3:].columns, 'uncov_fract': uncovered_samples,
-                                      'htz_frac': heterozygous_samples, 'faulty_frac': uncovered_samples + heterozygous_samples})
+                                       'htz_frac': heterozygous_samples, 'faulty_frac': uncovered_samples + heterozygous_samples})
         faulty_samples = report_samples['sample'][(report_samples.uncov_fract >= min_threshold_discard_uncov_sample) | (
             report_samples.htz_frac >= min_threshold_discard_htz_sample) | (report_samples.faulty_frac >= min_threshold_discard_all_sample)].tolist()
 
@@ -1152,13 +1166,13 @@ if __name__ == '__main__':
         prior = datetime.datetime.now()
 
         recalibrated_snp_matrix_intermediate = ddbb_create_intermediate(
-            out_variant_dir, out_stats_coverage_dir, min_freq_discard=0.2, min_alt_dp=10, only_snp=False, samples=sample_list)
+            out_variant_dir, out_stats_coverage_dir, min_freq_discard=0.2, min_alt_dp=12, only_snp=False, samples=sample_list)
         # recalibrated_snp_matrix_intermediate.to_csv(
         #     compare_snp_matrix_recal_intermediate, sep='\t', index=False)
 
         after = datetime.datetime.now()
         print(('\n' + "Done with function ddbb_create_intermediate in: %s" %
-              (after - prior) + "\n"))
+               (after - prior) + "\n"))
 
         # Remove SNPs from BED file (PE/PPE)
 
@@ -1171,7 +1185,7 @@ if __name__ == '__main__':
 
             after = datetime.datetime.now()
             print(('\n' + "Done with function remove_bed_positions in: %s" %
-                  (after - prior) + "\n"))
+                   (after - prior) + "\n"))
 
         recalibrated_snp_matrix_intermediate.to_csv(
             compare_snp_matrix_recal_intermediate, sep="\t", index=False)
@@ -1187,7 +1201,7 @@ if __name__ == '__main__':
 
         after = datetime.datetime.now()
         print(('\n' + "Done with function recalibrate_ddbb_vcf_intermediate in: %s" %
-              (after - prior) + "\n"))
+               (after - prior) + "\n"))
 
         # Remove SNPs located within INDELs
 
@@ -1200,7 +1214,7 @@ if __name__ == '__main__':
 
         after = datetime.datetime.now()
         print(("Done with function remove_position_range in: %s" %
-              (after - prior) + "\n"))
+               (after - prior) + "\n"))
 
         # Extract all positions marked as complex
 
@@ -1212,7 +1226,7 @@ if __name__ == '__main__':
 
         after = datetime.datetime.now()
         print(("Done with function extract_complex_list in: %s" %
-              (after - prior) + "\n"))
+               (after - prior) + "\n"))
 
         # Clean all faulty positions and samples for final table
 
