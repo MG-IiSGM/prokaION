@@ -22,7 +22,7 @@ from misc_prokaion import (check_create_dir, check_file_exists, extract_read_lis
                            create_coverage, obtain_group_cov_stats, obtain_overal_stats, ivar_consensus, replace_consensus_header, remove_low_quality, rename_reference_snpeff, annotate_snpeff, user_annotation, user_annotation_aa, make_blast, kraken, mash_screen)
 
 from compare_snp_prokaion import (ddbb_create_intermediate, recalibrate_ddbb_vcf_intermediate,
-                                  remove_position_range, extract_complex_list, revised_df, ddtb_compare, remove_bed_positions)
+                                  remove_position_range, extract_complex_list, revised_df, ddtb_compare, remove_bed_positions, extract_only_snps)
 
 
 """
@@ -202,7 +202,7 @@ def get_arguments():
         'Compare', 'parameters for compare_snp')
 
     compare_group.add_argument('-S', '--only_snp', required=False,
-                               action='store_true', help='Use INDELS while comparing')
+                               action='store_true', help='Create the results only with SNPs, removing INDELs')
 
     compare_group.add_argument("-w", "--window", required=False, type=int,
                                default=2, help="Number of SNPs in 10bp to discard. Default: 2")
@@ -1236,6 +1236,7 @@ if __name__ == "__main__":
         full_path_compare + ".revised_intermediate_vcf.tsv")
     compare_snp_matrix_INDEL_intermediate = (
         full_path_compare + ".revised_INDEL_intermediate.tsv")
+    compare_only_snps = full_path_compare + "_ONLY_SNPs.revised.tsv"
 
     # Create intermediate
 
@@ -1312,6 +1313,11 @@ if __name__ == "__main__":
     recalibrated_revised_INDEL_df.to_csv(
         compare_snp_matrix_recal, sep='\t', index=False)
 
+    if args.only_snp:
+        compare_only_snps_df = extract_only_snps(
+            compare_snp_matrix_recal)
+        compare_only_snps_df.to_csv(compare_only_snps, sep="\t", index=False)
+
     after = datetime.datetime.now()
     print(("Done with function revised_df in: %s" % (after - prior) + "\n"))
 
@@ -1319,7 +1325,10 @@ if __name__ == "__main__":
 
     prior = datetime.datetime.now()
 
-    ddtb_compare(compare_snp_matrix_recal, distance=5)
+    ddtb_compare(compare_snp_matrix_recal, distance=args.distance)
+
+    if args.only_snp:
+        ddtb_compare(compare_only_snps, distance=args.distance)
 
     after = datetime.datetime.now()
     print(("Done with function ddtb_compare in: %s" % (after - prior) + "\n"))

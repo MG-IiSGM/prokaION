@@ -50,7 +50,7 @@ def get_arguments():
     parser.add_argument('-s', '--sample_list', default=False, required=False,
                         help='File with sample names to analyse instead of all samples')
 
-    parser.add_argument('-d', '--distance', default=0, required=False,
+    parser.add_argument('-d', '--distance', default=15, required=False,
                         help='Minimun distance to cluster groups after comparison')
 
     parser.add_argument('-c', '--only-compare', dest="only_compare", required=False,
@@ -94,6 +94,9 @@ def get_arguments():
 
     parser.add_argument('-o', '--output', type=str, required=True,
                         help='Name of all the output files, might include path')
+
+    parser.add_argument('-S', '--only_snp', required=False,
+                        action='store_true', help='Create the results only with SNPs, removing INDELs')
 
     arguments = parser.parse_args()
 
@@ -306,7 +309,7 @@ def ddbb_create_intermediate(variant_dir, coverage_dir, min_freq_discard=0.1, mi
     df = df[df.N > 0]
 
     df['Position'] = df.apply(lambda x: ('|').join(
-        [x['REGION'], x['REF'], str(x['POS']), x['ALT']]), axis=1)
+        [str(x['REGION']), str(x['REF']), str(x['POS']), str(x['ALT'])]), axis=1)
 
     df = df.drop(['REGION', 'REF', 'POS', 'ALT'], axis=1)
 
@@ -743,6 +746,16 @@ def revised_df(df, out_dir=False, complex_pos=False, min_freq_include=0.7, min_t
     return df
 
 
+def extract_only_snps(revised_df):
+    df = pd.read_csv(revised_df, sep='\t')
+    # df['ref'] = df['Position'].apply(lambda x: x.split('|')[1])
+    # df['alt'] = df['Position'].apply(lambda x: x.split('|')[3])
+    # df_snps = df[(df['ref'].str.len() == 1) & (df['alt'].str.len() == 1)]
+    df_snps = df[df['Position'].str.split('|', expand=True)[
+        [1, 3]].applymap(len).eq(1).all(axis=1)]
+    return df_snps
+
+
 def dendogram_dataframe(dataframe, output_file):
 
     dataframe_only_samples = dataframe.set_index(dataframe['Position']).drop(
@@ -1160,6 +1173,7 @@ if __name__ == '__main__':
             ".revised_intermediate_vcf.tsv"
         compare_snp_matrix_INDEL_intermediate = full_path_compare + \
             ".revised_INDEL_intermediate.tsv"
+        compare_only_snps = full_path_compare + "_ONLY_SNPs.revised.tsv"
 
         # Create intermediate
 
@@ -1181,7 +1195,7 @@ if __name__ == '__main__':
             prior = datetime.datetime.now()
 
             recalibrated_snp_matrix_intermediate = remove_bed_positions(
-                recalibrated_snp_matrix_intermediate, args.remove_bed)
+                recalibrated_snp_matrix_intermediate, args.remove_bed, full_path_compare)
 
             after = datetime.datetime.now()
             print(('\n' + "Done with function remove_bed_positions in: %s" %
@@ -1242,6 +1256,12 @@ if __name__ == '__main__':
         recalibrated_revised_INDEL_df.to_csv(
             compare_snp_matrix_recal, sep='\t', index=False)
 
+        if args.only_snp:
+            compare_only_snps_df = extract_only_snps(
+                compare_snp_matrix_recal)
+            compare_only_snps_df.to_csv(
+                compare_only_snps, sep="\t", index=False)
+
         after = datetime.datetime.now()
         print(("Done with function revised_df in: %s" % (after - prior) + "\n"))
 
@@ -1249,7 +1269,10 @@ if __name__ == '__main__':
 
         prior = datetime.datetime.now()
 
-        ddtb_compare(compare_snp_matrix_recal, distance=5)
+        ddtb_compare(compare_snp_matrix_recal, distance=args.distance)
+
+        if args.only_snp:
+            ddtb_compare(compare_only_snps, distance=args.distance)
 
         after = datetime.datetime.now()
         print(("Done with function ddtb_compare in: %s" % (after - prior) + "\n"))

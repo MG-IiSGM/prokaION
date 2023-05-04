@@ -477,7 +477,7 @@ if __name__ == "__main__":
 
             after = datetime.datetime.now()
             print(("Done with function kraken & mash_screen in: %s" %
-                  (after - prior) + "\n"))
+                   (after - prior) + "\n"))
 
             ##### MAPPING #####
 
@@ -502,7 +502,7 @@ if __name__ == "__main__":
 
             after = datetime.datetime.now()
             print(("Done with function minimap2_mapping in: %s" %
-                  (after - prior) + "\n"))
+                   (after - prior) + "\n"))
 
             ##### VARIANT CALLING #####
 
@@ -531,7 +531,7 @@ if __name__ == "__main__":
 
                 after = datetime.datetime.now()
                 print(("Done with function freebayes_variant in: %s" %
-                      (after - prior) + "\n"))
+                       (after - prior) + "\n"))
 
                 # Filtering the raw variant calling by quality, depth and frequency with bcftools. Also extracting complex variations and MNP with snippy-vcf_extract_subs
 
@@ -591,7 +591,7 @@ if __name__ == "__main__":
 
                 after = datetime.datetime.now()
                 print(("Done with function extract_indels & merge_vcf in: %s" %
-                      (after - prior) + "\n"))
+                       (after - prior) + "\n"))
 
                 # Variant format adaptation
 
@@ -612,7 +612,7 @@ if __name__ == "__main__":
 
                 after = datetime.datetime.now()
                 print(("Done with function vcf_to_ivar_tsv in: %s" %
-                      (after - prior) + "\n"))
+                       (after - prior) + "\n"))
 
                 ##### CONSENSUS #####
 
@@ -663,7 +663,7 @@ if __name__ == "__main__":
 
         after = datetime.datetime.now()
         print(("Done with function create_bamstat in: %s" %
-              (after - prior) + "\n"))
+               (after - prior) + "\n"))
 
         # Create Coverage
 
@@ -684,7 +684,7 @@ if __name__ == "__main__":
 
         after = datetime.datetime.now()
         print(("Done with function create_coverage in: %s" %
-              (after - prior) + "\n"))
+               (after - prior) + "\n"))
 
     # Coverage Output summary
 
@@ -712,7 +712,7 @@ if __name__ == "__main__":
                 group_name + END_FORMATTING)
 
     uncovered_samples = remove_low_quality(
-        output_dir, output_dir, mean_cov=args.coverage20, unmapped_per=args.unmapped, min_hq_snp=args.min_snp, type_remove="Uncovered")
+        output_dir, output_dir, cov20=args.coverage20, unmapped_per=args.unmapped, min_hq_snp=args.min_snp, type_remove="Uncovered")
 
     if len(uncovered_samples) > 1:
         logger.info(RED + BOLD + "Uncovered samples: " +
@@ -873,7 +873,7 @@ if __name__ == "__main__":
 
     after = datetime.datetime.now()
     print(("Done with function ddbb_create_intermediate in: %s" %
-          (after - prior) + "\n"))
+           (after - prior) + "\n"))
 
     # Remove SNPs from BED file (PE/PPE)
 
@@ -886,7 +886,7 @@ if __name__ == "__main__":
 
         after = datetime.datetime.now()
         print(('\n' + "Done with function remove_bed_positions in: %s" %
-              (after - prior) + "\n"))
+               (after - prior) + "\n"))
 
     recalibrated_snp_matrix_intermediate.to_csv(
         compare_snp_matrix_recal_intermediate, sep="\t", index=False)
@@ -902,7 +902,7 @@ if __name__ == "__main__":
 
     after = datetime.datetime.now()
     print(('\n' + "Done with function recalibrate_ddbb_vcf_intermediate in: %s" %
-          (after - prior) + "\n"))
+           (after - prior) + "\n"))
 
     # Remove SNPs located within INDELs
 
@@ -915,7 +915,7 @@ if __name__ == "__main__":
 
     after = datetime.datetime.now()
     print(("Done with function remove_position_range in: %s" %
-          (after - prior) + "\n"))
+           (after - prior) + "\n"))
 
     # Extract all positions marked as complex
 
@@ -927,7 +927,7 @@ if __name__ == "__main__":
 
     after = datetime.datetime.now()
     print(("Done with function extract_complex_list in: %s" %
-          (after - prior) + "\n"))
+           (after - prior) + "\n"))
 
     # Clean all faulty positions and samples for final table
 

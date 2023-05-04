@@ -1035,27 +1035,37 @@ def user_annotation(tsv_file, output_file, vcf_files=[], bed_files=[]):
     df.to_csv(output_file, sep="\t", index=False)
 
 
-def checkAA(snpEffRow, dfAnnot):
+def checkAA(snpEffRow, dfAnnot, gene):
     df = dfAnnot
-    df["aaAnnot"] = df["aa"] + ":" + df["annot"]
+    df['aaAnnot'] = df['aa'] + ":" + df['annot']
     presence_list = [annot in snpEffRow for annot in dfAnnot.aa]
-    annotation_list = np.array(df.aaAnnot.tolist())
 
-    return (",").join(annotation_list[np.array(presence_list)])
+    if any(":" in annot for annot in dfAnnot.annot):
+        for idx, row in dfAnnot.iterrows():
+            if ":" in row.annot:
+                annot_split = row.annot.split(":")
+                if row.aa in snpEffRow and annot_split[0] in gene:
+                    return row.aaAnnot
+    else:
+        annotation_list = np.array(df.aaAnnot.tolist())
+        return (',').join(annotation_list[np.array(presence_list)])
 
 
 def annotate_aa(annot_file, aas):
+
     df = pd.read_csv(annot_file, sep="\t")
+    df = df.drop_duplicates(subset=["POS", "ALT"], keep="first")
 
     for aa in aas:
         header = (".").join(aa.split("/")[-1].split(".")[0:-1])
-        dfaa = pd.read_csv(aa, sep="\t", names=["aa", "annot"])
+        dfaa = pd.read_csv(aa, sep="\t", names=['aa', 'annot'])
         if not header in df.columns:
-            logger.info("ANNOTATING AA: {}".format(aa))
+            print("ANNOTATING AA: {}".format(aa))
             df['HGVS.p'] = df['HGVS.p'].astype(str)
-            df[header] = df.apply(lambda x: checkAA(x["HGVS.p"], dfaa), axis=1)
+            df[header] = df.apply(lambda x: checkAA(
+                x['HGVS.p'], dfaa, x['Gene_Name']), axis=1)
         else:
-            logger.info("SKIPPED AA: {}".format(aa))
+            print("SKIPPED AA: {}".format(aa))
 
     return df
 
