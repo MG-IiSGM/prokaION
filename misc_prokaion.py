@@ -99,7 +99,7 @@ def execute_subprocess(cmd, isShell=False, isInfo=False):
 
     except OSError as e:
         sys.exit(RED + BOLD + "Failed to execute program '%s': %s" % (prog,
-                 str(e)) + END_FORMATTING)
+                                                                      str(e)) + END_FORMATTING)
 
 
 ### Manipulation of files and paths ###
@@ -178,7 +178,7 @@ def check_reanalysis(output_dir, samples_to_analyze):
 
     # Check how many folders exist
     file_exist = sum([os.path.exists(x)
-                     for x in previous_files])  # True = 1, False = 0
+                      for x in previous_files])  # True = 1, False = 0
 
     # Handle reanalysis: First time; reanalysis or realysis with aditional samples
     if file_exist > 0:  # Already analysed
@@ -208,7 +208,7 @@ def file_to_list(file_name):
     return list_F
 
 
-def remove_low_quality(input_dir, output_dir, mean_cov=20, unmapped_per=50, min_hq_snp=8, type_remove="Uncovered"):
+def remove_low_quality(input_dir, output_dir, cov20=70, unmapped_per=25, min_hq_snp=8, type_remove="Uncovered"):
 
     right_now = str(datetime.datetime.now())
     right_now_full = "_".join(right_now.split(" "))
@@ -260,7 +260,7 @@ def remove_low_quality(input_dir, output_dir, mean_cov=20, unmapped_per=50, min_
                     stats_df["HQ_SNP"] = stats_df["HQ_SNP"].astype(float)
 
                     # Store samples under any of the parameters indicated
-                    uncovered_samples = stats_df["#SAMPLE"][(stats_df['MEAN_COV'] <= mean_cov) | (stats_df["UNMAPPED_PROP"] >= unmapped_per) | (
+                    uncovered_samples = stats_df["#SAMPLE"][(stats_df["COV>20X"] <= cov20) | (stats_df["UNMAPPED_PROP"] >= unmapped_per) | (
                         stats_df["HQ_SNP"] < min_hq_snp)].tolist()
                     # print(uncovered_samples)
 
@@ -734,7 +734,7 @@ def import_tsv_freebayes_to_df(tsv_file, sep="\t"):
     df = pd.read_csv(tsv_file, sep=sep)
 
     df.rename(columns={"#CHROM": "REGION", "RO": "REF_DP",
-              "DP": "TOTAL_DP", "AO": "ALT_DP", "QUAL": "ALT_QUAL"}, inplace=True)
+                       "DP": "TOTAL_DP", "AO": "ALT_DP", "QUAL": "ALT_QUAL"}, inplace=True)
 
     df["REF_FREQ"] = df["REF_DP"] / df["TOTAL_DP"]
     df["ALT_FREQ"] = df["ALT_DP"] / df["TOTAL_DP"]
@@ -1035,27 +1035,37 @@ def user_annotation(tsv_file, output_file, vcf_files=[], bed_files=[]):
     df.to_csv(output_file, sep="\t", index=False)
 
 
-def checkAA(snpEffRow, dfAnnot):
+def checkAA(snpEffRow, dfAnnot, gene):
     df = dfAnnot
-    df["aaAnnot"] = df["aa"] + ":" + df["annot"]
+    df['aaAnnot'] = df['aa'] + ":" + df['annot']
     presence_list = [annot in snpEffRow for annot in dfAnnot.aa]
-    annotation_list = np.array(df.aaAnnot.tolist())
 
-    return (",").join(annotation_list[np.array(presence_list)])
+    if any(":" in annot for annot in dfAnnot.annot):
+        for idx, row in dfAnnot.iterrows():
+            if ":" in row.annot:
+                annot_split = row.annot.split(":")
+                if row.aa in snpEffRow and annot_split[0] in gene:
+                    return row.aaAnnot
+    else:
+        annotation_list = np.array(df.aaAnnot.tolist())
+        return (',').join(annotation_list[np.array(presence_list)])
 
 
 def annotate_aa(annot_file, aas):
+
     df = pd.read_csv(annot_file, sep="\t")
+    df = df.drop_duplicates(subset=["POS", "ALT"], keep="first")
 
     for aa in aas:
         header = (".").join(aa.split("/")[-1].split(".")[0:-1])
-        dfaa = pd.read_csv(aa, sep="\t", names=["aa", "annot"])
+        dfaa = pd.read_csv(aa, sep="\t", names=['aa', 'annot'])
         if not header in df.columns:
-            logger.info("ANNOTATING AA: {}".format(aa))
+            print("ANNOTATING AA: {}".format(aa))
             df['HGVS.p'] = df['HGVS.p'].astype(str)
-            df[header] = df.apply(lambda x: checkAA(x["HGVS.p"], dfaa), axis=1)
+            df[header] = df.apply(lambda x: checkAA(
+                x['HGVS.p'], dfaa, x['Gene_Name']), axis=1)
         else:
-            logger.info("SKIPPED AA: {}".format(aa))
+            print("SKIPPED AA: {}".format(aa))
 
     return df
 
