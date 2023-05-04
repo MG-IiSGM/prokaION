@@ -267,6 +267,9 @@ def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_
     # -r: Search for input file recursively
     # -s: Path to save files
     # -t: Number of worker threads
+    # --num_barcoding_threads: Number of worker threads to use for barcoding.
+    # -x: Specify GPU device to accelerate barcode detection: 'auto', or 'cuda:<device_id>'.
+
     # --fastq_out: Output Fastq files
     # --compress_fastq: Compress fastq output files with gzip
     # --barcode_kits: Space separated list of barcoding kit(s) or expansion kit(s) to detect against. Must be in double quotes
@@ -274,12 +277,12 @@ def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_
     # --records_per_fastq: Maximum number of records per fastq file, 0 means use a single file (per worker, per run id)
     # --allow_inferior_barcodes: Reads will still be classified even if both the barcodes at the front and rear (if applicable) were not the best scoring barcodes above the min_score.
 
-    # --trim_barcodes: Trim the barcodes from the sequences in the output files. > --disable_trim_barcodes
-    # --trim_adapters: Trim the adapters from the sequences in the output files.
-    # --trim_primers: Trim the primers from the sequences in the output files.
     # --detect_barcodes: Detect barcode sequences at the front and rear of the read.
     # --detect_adapter: Detect adapter sequences at the front and rear of the read.
     # --detect_primer: Detect primer sequences at the front and rear of the read.
+    # --enable_trim_barcodes: Enable trimming of barcodes from the sequences in the output files. By default is false, barcodes will not be trimmed.
+    # --trim_adapters: Trim the adapters from the sequences in the output files.
+    # --trim_primers: Trim the primers from the sequences in the output files.
 
     # --min_score_barcode_front: Minimum score to consider a front barcode to be a valid barcode alignment (Default: 60).
     # --min_score_barcode_rear: Minimum score to consider a rear barcode to be a valid alignment (and min_score_front will then be used for the front only when this is set).
@@ -294,7 +297,7 @@ def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_
         require_barcodes_both_ends = ""
 
     cmd = ["guppy_barcoder", "-i", out_basecalling_dir, "-s", out_barcoding_dir, "-r", require_barcodes_both_ends,
-           "--barcode_kits", barcode_kit, "-t", str(threads), '--detect_barcodes', '--detect_primer', '--trim_primers', '--detect_adapter', '--trim_adapters', "--fastq_out", "--compress_fastq"]
+           "--barcode_kits", barcode_kit, "-t", str(threads), '--num_barcoding_threads', str(threads), '--detect_barcodes', '--enable_trim_barcodes', '--detect_primer', '--trim_primers', '--detect_adapter', '--trim_adapters', "--fastq_out", "--compress_fastq"]
 
     print(cmd)
     execute_subprocess(cmd, isShell=False)
