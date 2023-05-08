@@ -22,7 +22,7 @@ from misc_prokaion import (check_create_dir, check_file_exists, extract_read_lis
                            create_coverage, obtain_group_cov_stats, obtain_overal_stats, ivar_consensus, replace_consensus_header, remove_low_quality, rename_reference_snpeff, annotate_snpeff, user_annotation, user_annotation_aa, make_blast, kraken, mash_screen)
 
 from compare_snp_prokaion import (ddbb_create_intermediate, recalibrate_ddbb_vcf_intermediate,
-                                  remove_position_range, extract_complex_list, revised_df, ddtb_compare, remove_bed_positions, extract_only_snps)
+                                  remove_position_range, extract_complex_list, revised_df, ddtb_compare, remove_bed_positions, extract_only_snps, extract_bed_positions)
 
 
 """
@@ -195,6 +195,9 @@ def get_arguments():
     annot_group.add_argument('-R', '--remove_bed', type=str, default=False,
                              required=False, help='BED file with positions to remove')
 
+    annot_group.add_argument('-P', '--extract_bed', required=False, type=str,
+                             default=False, help='BED file with important positions or genes to annotate')
+
     annot_group.add_argument('--snpeff_database', type=str, required=False,
                              default=False, help='snpEFF annotation database')
 
@@ -224,6 +227,9 @@ def get_arguments():
 
     compare_group.add_argument("--min_threshold_discard_all_pos", required=False, type=float,
                                default=0.55, help="Minimum inaccuracies to discard a position. Default: 0.55")
+
+    compare_group.add_argument('-D', '--distance', type=int, default=15, required=False,
+                               help='Minimun distance to cluster groups after comparison')
 
     arguments = parser.parse_args()
 
@@ -1335,6 +1341,18 @@ if __name__ == "__main__":
 
     after = datetime.datetime.now()
     print(("Done with function ddtb_compare in: %s" % (after - prior) + "\n"))
+
+    # Annotated SNPs from BED file (genes or positions of interest)
+
+    prior = datetime.datetime.now()
+
+    if args.extract_bed:
+        annotated_snps_final = extract_bed_positions(
+            recalibrated_revised_INDEL_df, args.extract_bed, full_path_compare)
+
+    after = datetime.datetime.now()
+    print(("Done with function extract_bed_positions in: %s" %
+           (after - prior) + "\n"))
 
     logger.info('\n' + MAGENTA + BOLD + 'COMPARISON FINISHED IN GROUP: ' +
                 group_name + END_FORMATTING + '\n')
