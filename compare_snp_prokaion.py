@@ -71,6 +71,9 @@ def get_arguments():
     parser.add_argument('-B', '--remove_bed', required=False, type=str,
                         default=False, help='BED file with positions to remove')
 
+    parser.add_argument('-P', '--extract_bed', required=False, type=str,
+                        default=False, help='BED file with important positions or genes to annotate')
+
     parser.add_argument('-R', '--reference', required=False, type=str, default=False,
                         help='Reference fasta file used in original variant calling')
 
@@ -376,6 +379,28 @@ def remove_bed_positions(df, bed_file, path_compare):
         df_filter.to_csv(filtered_position, sep="\t", index=False)
 
     return df
+
+
+def extract_bed_positions(df, bed_file, path_compare):
+    bed_df = bed_to_df(bed_file)
+    filtered_position = path_compare + ".annotated_position.tsv"
+
+    counter = 0
+
+    for _, row in df.iterrows():
+        position_number = int(row.Position.split("|")[2])
+        if any(start <= position_number <= end for (start, end) in zip(bed_df.start.values.tolist(), bed_df.end.values.tolist())):
+            logger.info('Position: {} annotated found in {}'.format(
+                row.Position, bed_file))
+            if counter == 0:
+                df_filter = df[df.Position == row.Position]
+            else:
+                df_aux = df[df.Position == row.Position]
+                df_filter = df_filter.append(df_aux, ignore_index=True)
+            counter += 1
+
+    if counter:
+        df_filter.to_csv(filtered_position, sep="\t", index=False)
 
 
 def recheck_variant_rawvcf_intermediate(row, positions, alt_snps, variant_dir, min_cov_low_freq=10):
@@ -1276,6 +1301,18 @@ if __name__ == '__main__':
 
         after = datetime.datetime.now()
         print(("Done with function ddtb_compare in: %s" % (after - prior) + "\n"))
+
+        # Annotated SNPs from BED file (genes or positions of interest)
+
+        prior = datetime.datetime.now()
+
+        if args.extract_bed:
+            annotated_snps_final = extract_bed_positions(
+                recalibrated_revised_INDEL_df, args.extract_bed, full_path_compare)
+
+        after = datetime.datetime.now()
+        print(("Done with function extract_bed_positions in: %s" %
+               (after - prior) + "\n"))
 
         logger.info('\n' + MAGENTA + BOLD + 'COMPARISON FINISHED IN GROUP: ' +
                     group_name + END_FORMATTING + '\n')
