@@ -121,6 +121,9 @@ def get_arguments():
     guppy_group.add_argument("--tailcrop", type=int, dest="tailcrop", required=False,
                              default=20, help="Trim n nucleotides from end of read. Default: 20")
 
+    guppy_group.add_argument("--length", type=int, dest="length", required=False,
+                             default=200, help="Filter on a minimum read length. Default: 200bp")
+
     varcal_group = parser.add_argument_group('Varcal', 'Varcal parameters')
 
     varcal_group.add_argument("-sample", "--sample", metavar="sample",
@@ -137,6 +140,9 @@ def get_arguments():
 
     varcal_group.add_argument("--ploidy", type=int, dest="ploidy", required=False,
                               default=1, help="Sets the default ploidy for the analysis")
+
+    varcal_group.add_argument("-amplicon", "--amplicon", required=False, action="store_true",
+                              help="Mapping performed using ngmlr")
 
     species_group = parser.add_argument_group(
         "Species determination", "Species databases")
@@ -331,8 +337,8 @@ def ONT_QC_filtering(output_samples, filtered_samples):
     # --headcrop: Trim n nucleotides from start of read
     # --tailcrop: Trim n nucleotides from end of read
 
-    cmd_filtering = "gunzip -c {} | NanoFilt -q {} --headcrop {} --tailcrop {} | gzip > {}".format(
-        output_samples, str(args.min_read_quality), str(args.headcrop), str(args.tailcrop), filtered_samples)
+    cmd_filtering = "gunzip -c {} | NanoFilt -q {} --length {} --headcrop {} --tailcrop {} | gzip > {}".format(
+        output_samples, str(args.min_read_quality), str(args.length), str(args.headcrop), str(args.tailcrop), filtered_samples)
 
     # print(cmd_filtering)
     execute_subprocess(cmd_filtering, isShell=True)
@@ -379,6 +385,28 @@ def minimap2_mapping(HQ_filename, filename_bam_out, reference):
         reference, HQ_filename, filename_bam_out)
     # print(cmd_minimap2)
     execute_subprocess(cmd_minimap2, isShell=True)
+
+    cmd_indexing = "samtools", "index", filename_bam_out
+    # print(cmd_indexing)
+    execute_subprocess(cmd_indexing, isShell=False)
+
+
+def ngmlr_mapping(HQ_filename, filename_bam_out, reference, threads=30):
+    """
+    https://github.com/philres/ngmlr
+    """
+
+    # -r <file>, --reference <file>
+    # -q <file>, --query <file>
+    # -o <string>, --output <string>
+    # -t <int>, --threads <int>
+    # -x <pacbio, ont>, --presets <pacbio, ont>
+    # -i <0-1>, --min-identity <0-1> - Alignments with an identity lower than this threshold will be discarded [0.65]
+
+    cmd_ngmlr = "ngmlr -t {} -r {} -q {} -x ont | samtools view -bS -F 4 - | samtools sort -o {}".format(
+        threads, reference, HQ_filename, filename_bam_out)
+    # print(cmd_ngmlr)
+    execute_subprocess(cmd_ngmlr, isShell=True)
 
     cmd_indexing = "samtools", "index", filename_bam_out
     # print(cmd_indexing)
@@ -880,12 +908,17 @@ if __name__ == "__main__":
             else:
                 logger.info(GREEN + "Mapping sample " +
                             filename_out + END_FORMATTING)
-                minimap2_mapping(HQ_filename, filename_bam_out,
-                                 reference=args.reference)
+
+                if args.amplicon:
+                    ngmlr_mapping(HQ_filename, filename_bam_out,
+                                  reference, threads=args.threads)
+                else:
+                    minimap2_mapping(HQ_filename, filename_bam_out,
+                                     reference=args.reference)
 
             after = datetime.datetime.now()
-            print(("Done with function minimap2_mapping in: %s" %
-                   (after - prior) + "\n"))
+            print(f"Done with function {'ngmlr_mapping' if args.amplicon else 'minimap2_mapping'} in: %s" % (
+                after - prior) + "\n")
 
             ##### VARIANT CALLING #####
 
