@@ -234,7 +234,7 @@ def get_arguments():
     compare_group.add_argument("--min_threshold_discard_all_pos", required=False, type=float,
                                default=0.55, help="Minimum inaccuracies to discard a position. Default: 0.55")
 
-    compare_group.add_argument('-D', '--distance', type=int, default=15, required=False,
+    compare_group.add_argument('-D', '--distance', type=int, default=50, required=False,
                                help='Minimun distance to cluster groups after comparison')
 
     arguments = parser.parse_args()
