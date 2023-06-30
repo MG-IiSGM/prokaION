@@ -50,7 +50,7 @@ def get_arguments():
     parser.add_argument('-s', '--sample_list', default=False, required=False,
                         help='File with sample names to analyse instead of all samples')
 
-    parser.add_argument('-d', '--distance', default=15, required=False,
+    parser.add_argument('-d', '--distance', default=50, required=False,
                         help='Minimun distance to cluster groups after comparison')
 
     parser.add_argument('-c', '--only-compare', dest="only_compare", required=False,
