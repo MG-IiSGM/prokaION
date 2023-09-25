@@ -122,7 +122,7 @@ def get_arguments():
                              default=20, help="Trim n nucleotides from end of read. Default: 20")
 
     guppy_group.add_argument("--length", type=int, dest="length", required=False,
-                             default=200, help="Filter on a minimum read length. Default: 200bp")
+                             default=150, help="Filter on a minimum read length. Default: 150bp")
 
     varcal_group = parser.add_argument_group('Varcal', 'Varcal parameters')
 
@@ -334,11 +334,12 @@ def ONT_QC_filtering(output_samples, filtered_samples):
 
     # -c: Write on standard output, keep the original files unchanged
     # -q: Filter on a minimum average read quality score
+    # --minlength: Filter on a minimum read length
     # --headcrop: Trim n nucleotides from start of read
     # --tailcrop: Trim n nucleotides from end of read
 
-    cmd_filtering = "gunzip -c {} | NanoFilt -q {} --length {} --headcrop {} --tailcrop {} | gzip > {}".format(
-        output_samples, str(args.min_read_quality), str(args.length), str(args.headcrop), str(args.tailcrop), filtered_samples)
+    cmd_filtering = "gunzip -c {} | chopper -q {} --minlength {} --headcrop {} --tailcrop {} --threads {} | gzip > {}".format(
+        output_samples, str(args.min_read_quality), str(args.length), str(args.headcrop), str(args.tailcrop), str(args.threads), filtered_samples)
 
     # print(cmd_filtering)
     execute_subprocess(cmd_filtering, isShell=True)
@@ -739,13 +740,14 @@ if __name__ == "__main__":
     logger.info("\n" + GREEN + BOLD +
                 "QUALITY CHECK IN RAW" + END_FORMATTING + '\n')
 
-    for root, _, files in os.walk(out_samples_dir):
+    for root, _, files in os.walk(output_dir):
         for name in files:
             if name.endswith('.fastq.gz'):
-                raw_sample = os.path.join(root, name)
+                # raw_sample = os.path.join(root, name) ## (output_samples)
+                filtered_samples = os.path.join(root, name) ## (output_dir)
                 # print(raw_sample)
                 out_qc = os.path.join(
-                    out_qc_dir, os.path.basename(raw_sample.split(".")[0]))
+                    out_qc_dir, os.path.basename(filtered_samples.split(".")[0]))
                 check_create_dir(out_qc)
                 # print(out_qc)
                 report = [x for x in os.listdir(
@@ -759,7 +761,7 @@ if __name__ == "__main__":
                 else:
                     logger.info(GREEN + "Checking quality in sample " +
                                 name + END_FORMATTING)
-                    ONT_quality(raw_sample, out_qc, threads=args.threads)
+                    ONT_quality(filtered_samples, out_qc, threads=args.threads)
 
     after = datetime.datetime.now()
     print(("\n" + "Done with function ONT_quality in: %s" % (after - prior) + "\n"))
@@ -1049,8 +1051,15 @@ if __name__ == "__main__":
 
                     # Find another solution, if we set q>7 an error occur "Segmentation fault", they are trying to fix it.
                     ivar_consensus(filename_bam_out, out_consensus_dir, filename_out, min_quality=5,
-                                   min_frequency_threshold=0.6, min_depth=5, uncovered_character="N")
+                                   min_frequency_threshold=0.7, min_depth=12, uncovered_character="N")
                     replace_consensus_header(out_consensus_file)
+
+                for root, _, files in os.walk(out_consensus_dir):
+                    for name in files:
+                        if name.endswith('qual.txt'):
+                            qual_consensus = os.path.join(
+                                out_consensus_dir, name)
+                            os.remove(qual_consensus)
 
                 after = datetime.datetime.now()
                 print(("Done with function ivar_consensus & replace_consensus_header in: %s" % (
@@ -1299,7 +1308,7 @@ if __name__ == "__main__":
         prior = datetime.datetime.now()
 
         recalibrated_snp_matrix_intermediate = remove_bed_positions(
-            recalibrated_snp_matrix_intermediate, args.remove_bed)
+            recalibrated_snp_matrix_intermediate, args.remove_bed, full_path_compare)
 
         after = datetime.datetime.now()
         print(('\n' + "Done with function remove_bed_positions in: %s" %
