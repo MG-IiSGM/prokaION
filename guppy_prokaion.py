@@ -191,12 +191,12 @@ def ONT_QC_filtering(output_samples, filtered_samples):
 
     # -c: Write on standard output, keep the original files unchanged
     # -q: Filter on a minimum average read quality score
-    # --length: Filter on a minimum read length
+    # --minlength: Filter on a minimum read length
     # --headcrop: Trim n nucleotides from start of read
     # --tailcrop: Trim n nucleotides from end of read
 
-    cmd_filtering = "gunzip -c {} | NanoFilt -q {} --length {} --headcrop {} --tailcrop {} | gzip > {}".format(
-        output_samples, str(args.min_quality), str(args.length), str(args.headcrop), str(args.tailcrop), filtered_samples)
+    cmd_filtering = "gunzip -c {} | chopper -q {} --minlength {} --headcrop {} --tailcrop {} --threads {} | gzip > {}".format(
+        output_samples, str(args.min_read_quality), str(args.length), str(args.headcrop), str(args.tailcrop), str(args.threads), filtered_samples)
 
     # print(cmd_filtering)
     execute_subprocess(cmd_filtering, isShell=True)
@@ -301,6 +301,12 @@ if __name__ == "__main__":
     else:
         basecalling_ion(input_dir, out_basecalling_dir,
                         config=args.config, records=args.records_per_fastq)
+
+    for root, _, files in os.walk(out_basecalling_dir):
+        for name in files:
+            if name.startswith('guppy_basecaller_log'):
+                log_file = os.path.join(out_basecalling_dir, name)
+                os.remove(log_file)
 
     after = datetime.datetime.now()
     print(("Done with function basecalling_ion in: %s" % (after - prior) + "\n"))
