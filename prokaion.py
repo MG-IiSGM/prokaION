@@ -86,42 +86,46 @@ def get_arguments():
     input_group.add_argument('-t', '--threads', type=int, dest='threads',
                              required=False, default=30, help='Threads to use. Default: 30)')
 
-    guppy_group = parser.add_argument_group('Guppy', 'Guppy parameters')
+    basecall_group = parser.add_argument_group('Basecall', 'Basecall parameters')
 
-    guppy_group.add_argument('-s', '--samples', metavar='Samples', type=str,
+    basecall_group.add_argument('-s', '--samples', metavar='Samples', type=str,
                              required=False, help='Sample list for conversion from barcode to samples ID')
 
-    guppy_group.add_argument('-C', '--config', type=str, default='dna_r9.4.1_450bps_fast.cfg', required=False,
+    basecall_group.add_argument('--basecall', type=str, default='dorado', required=True, help="REQUIRED. Program to use in data preprocessing (basecaller and barcoder)")
+
+    basecall_group.add_argument('--model', type=str, default='/home/laura/Scripts/git_repos/Dorado/Models/dna_r9.4.1_e8_sup@v3.6', required=False, help='The basecaller model to run')
+
+    basecall_group.add_argument('-C', '--config', type=str, default='dna_r9.4.1_450bps_fast.cfg', required=False,
                              help='REQUIRED. Config parameter for guppy_basecalling [fast|hac|sup]. Default: dna_r9.4.1_450bps_fast.cfg | dna_r10.4_e8.1_fast.cfg"')
 
-    guppy_group.add_argument('-b', '--require_barcodes_both_ends', required=False, action='store_true',
+    basecall_group.add_argument('-b', '--require_barcodes_both_ends', required=False, action='store_true',
                              help='Require barcodes at both ends. By default it only requires the barcode at one end for the sequences identification')
 
-    guppy_group.add_argument('--barcode_kit', type=str, required=False, default='SQK-RBK110-96',
+    basecall_group.add_argument('--barcode_kit', type=str, required=False, default='SQK-RBK110-96',
                              help='Kit of barcodes used [SQK-RBK110-96|EXP-NBD196|SQK-NBD112-24]. Default: SQK-RBK110-96')
 
-    guppy_group.add_argument('-g', '--gpu', dest='gpu', required=False, default=False,
+    basecall_group.add_argument('-g', '--gpu', dest='gpu', required=False, default=False,
                              action="store_true", help='Specify GPU device: "auto", or "cuda:<device_id>"')
 
-    guppy_group.add_argument('--num_callers', type=int, dest='num_callers',
+    basecall_group.add_argument('--num_callers', type=int, dest='num_callers',
                              required=False, default=8, help="Number of parallel basecallers. Default: 8")
 
-    guppy_group.add_argument('--chunks', type=int, dest='chunks', required=False,
+    basecall_group.add_argument('--chunks', type=int, dest='chunks', required=False,
                              default=1536, help='Maximum chunks per runner. Default: 1536')
 
-    guppy_group.add_argument('--records_per_fastq', type=int, dest='records_per_fastq',
+    basecall_group.add_argument('--records_per_fastq', type=int, dest='records_per_fastq',
                              required=False, default=0, help='Maximum number of records per fastq')
 
-    guppy_group.add_argument("-rq", "--min_read_quality", type=int, dest="min_read_quality",
+    basecall_group.add_argument("-rq", "--min_read_quality", type=int, dest="min_read_quality",
                              required=False, default=8, help="Filter on a minimum average read quality score. Default: 8")
 
-    guppy_group.add_argument("--headcrop", type=int, dest="headcrop", required=False,
+    basecall_group.add_argument("--headcrop", type=int, dest="headcrop", required=False,
                              default=20, help="Trim n nucleotides from start of read. Default: 20")
 
-    guppy_group.add_argument("--tailcrop", type=int, dest="tailcrop", required=False,
+    basecall_group.add_argument("--tailcrop", type=int, dest="tailcrop", required=False,
                              default=20, help="Trim n nucleotides from end of read. Default: 20")
 
-    guppy_group.add_argument("--length", type=int, dest="length", required=False,
+    basecall_group.add_argument("--length", type=int, dest="length", required=False,
                              default=150, help="Filter on a minimum read length. Default: 150bp")
 
     varcal_group = parser.add_argument_group('Varcal', 'Varcal parameters')
@@ -244,6 +248,31 @@ def get_arguments():
 
 ### Functions from Guppy_prokaion.py ###
 
+def pod5_conversion(input_dir, out_pod5):
+
+    """
+    https://github.com/nanoporetech/pod5-file-format
+    """
+
+    cmd_conversion = "pod5 convert fast5 {}/*.fast5 --output {} --one-to-one {} --threads {}".format(input_dir, out_pod5, input_dir, str(args.threads))
+
+    print(cmd_conversion)
+    execute_subprocess(cmd_conversion, isShell=True)
+
+
+def basecalling_dorado(input_dir, out_basecalling_dir):
+
+    """
+    https://github.com/nanoporetech/dorado
+    """
+
+    fastq_basecalled = os.path.join(out_basecalling_dir, 'Dorado_basecalled.fastq')
+
+    cmd_basecalling = "dorado basecaller {} {} --emit-fastq > {}".format(str(args.model), input_dir, fastq_basecalled)
+
+    print(cmd_basecalling)
+    execute_subprocess(cmd_basecalling, isShell=True)
+
 def basecalling_ion(input_dir, out_basecalling_dir, config='dna_r9.4.1_450bps_fast.cfg', records=0):
 
     # -i: Path to input fast5 files
@@ -309,7 +338,7 @@ def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_
         require_barcodes_both_ends = ""
 
     cmd = ["guppy_barcoder", "-i", out_basecalling_dir, "-s", out_barcoding_dir, "-r", require_barcodes_both_ends,
-           "--barcode_kits", barcode_kit, "-t", str(threads), '--num_barcoding_threads', str(threads), '--detect_barcodes', '--enable_trim_barcodes', '--detect_primer', '--trim_primers', '--detect_adapter', '--trim_adapters', "--fastq_out", "--compress_fastq"]
+           "--barcode_kits", barcode_kit, "-t", str(threads), '--num_barcoding_threads', str(threads), '--detect_barcodes', '--min_score_barcode_front', str(85), '--min_score_barcode_rear', str(85), '--enable_trim_barcodes', '--detect_mid_strand_barcodes', '--min_score_barcode_mid', str(90), '--detect_primer', '--trim_primers', '--detect_adapter', '--trim_adapters', "--fastq_out", "--compress_fastq"]
 
     print(cmd)
     execute_subprocess(cmd, isShell=False)
@@ -597,29 +626,74 @@ if __name__ == "__main__":
     logger.info("\n" + CYAN + "{} Samples will be analysed: {}".format(
         len(sample_list), ",".join(sample_list)) + END_FORMATTING)
 
+
     ############### START PIPELINE ###############
 
-    # Basecalling
+    # Dorado
 
-    prior = datetime.datetime.now()
+    if args.basecall == 'dorado':
 
-    logger.info("\n" + GREEN + BOLD + "STARTING BASECALLING" + END_FORMATTING)
+        prior = datetime.datetime.now()
 
-    if os.path.isfile(basecalling_summary):
-        logger.info("\n" + YELLOW + BOLD +
-                    "Ommiting BASECALLING" + END_FORMATTING + "\n")
-    else:
-        basecalling_ion(input_dir, out_basecalling_dir,
-                        config=args.config, records=args.records_per_fastq)
+        logger.info("\n" + GREEN + "STARTING BASECALLING WITH DORADO" + END_FORMATTING + "\n")
 
-    for root, _, files in os.walk(out_basecalling_dir):
-        for name in files:
-            if name.startswith('guppy_basecaller_log'):
-                log_file = os.path.join(out_basecalling_dir, name)
-                os.remove(log_file)
+        fastq_basecalled = os.path.join(out_basecalling_dir, 'Dorado_basecalled.fastq')
 
-    after = datetime.datetime.now()
-    print(("Done with function basecalling_ion in: %s" % (after - prior) + "\n"))
+        if any(file.endswith('.fast5') for file in os.listdir(args.input_dir)):
+
+            out_pod5_dir = os.path.join(input_dir, "Pod5")
+            check_create_dir(out_pod5_dir)
+
+            if os.path.isfile(fastq_basecalled):
+                logger.info("\n" + YELLOW + BOLD + "Ommiting BASECALLING" + END_FORMATTING + "\n")
+
+            else:
+                pod5_conversion(input_dir, out_pod5_dir)
+
+                basecalling_dorado(out_pod5_dir, out_basecalling_dir)
+
+        elif any(file.endswith('.pod5') for file in os.listdir(args.input_dir)):
+
+            if os.path.isfile(fastq_basecalled):
+                logger.info("\n" + YELLOW + BOLD + "Ommiting BASECALLING" + END_FORMATTING + "\n")
+
+            else:
+                basecalling_dorado(input_dir, out_basecalling_dir)
+
+        else:
+            sys.exit(f"Error: The files in {input_dir} are not in .fast5 or pod5 format")
+
+        after = datetime.datetime.now()
+        print(("Done with function basecalling_dorado in: %s" % (after - prior) + "\n"))
+
+    # Guppy
+
+    elif args.basecall == 'guppy':
+
+        prior = datetime.datetime.now()
+
+        logger.info("\n" + GREEN + "STARTING BASECALLING WITH GUPPY" + END_FORMATTING + "\n")
+
+        if any(file.endswith('.fast5') for file in os.listdir(args.input_dir)):
+
+            if os.path.isfile(basecalling_summary):
+                logger.info("\n" + YELLOW + BOLD + "Ommiting BASECALLING" + END_FORMATTING + "\n")
+
+            else:
+                basecalling_ion(input_dir, out_basecalling_dir, config=args.config, records=args.records_per_fastq)
+
+            for root, _, files in os.walk(out_basecalling_dir):
+                for name in files:
+                    if name.startswith('guppy_basecaller_log'):
+                        log_file = os.path.join(out_basecalling_dir, name)
+                        os.remove(log_file)
+
+        else:
+            sys.exit(f"Error: The files in {input_dir} are not in .fast5 format")
+
+        after = datetime.datetime.now()
+        print(("Done with function basecalling_ion in: %s" % (after - prior) + "\n"))
+
 
     # Barcoding
 
