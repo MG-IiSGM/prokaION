@@ -557,12 +557,18 @@ def extract_snp_count(out_variant_dir, filename_out):
     if os.path.exists(filename):
         df = pd.read_csv(filename, sep="\t")
         df = df.drop_duplicates(subset=["POS", "REF", "ALT"], keep="first")
-        high_quality_snps = df["POS"][(df.TOTAL_DP >= 20) & (
-            df.ALT_FREQ >= 0.7) & (df.TYPE == "snp")].tolist()
-        htz_snps = df["POS"][(df.TOTAL_DP >= 20) & (df.ALT_FREQ < 0.7) & (
-            df.ALT_FREQ >= 0.3) & (df.TYPE == "snp")].tolist()
-        indels = df["POS"][(df.TOTAL_DP >= 20) & (df.ALT_FREQ >= 0.7) & (
-            (df.TYPE == "ins") | (df.TYPE == "del"))].tolist()
+        high_quality_snps = df["POS"][(df.TOTAL_DP >= 20) & 
+                                      (df.ALT_FREQ >= 0.7) & 
+                                      (df.TYPE == "snp") & 
+                                      ~df.OLDVAR.isin(['complex', 'mnp'])].tolist()
+        htz_snps = df["POS"][(df.TOTAL_DP >= 20) & 
+                             (df.ALT_FREQ < 0.7) & 
+                             (df.ALT_FREQ >= 0.3) & 
+                             (df.TYPE == "snp") & 
+                             ~df.OLDVAR.isin(['complex', 'mnp'])].tolist()
+        indels = df["POS"][(df.TOTAL_DP >= 20) & 
+                           (df.ALT_FREQ >= 0.7) & 
+                           ((df.TYPE == "ins") | (df.TYPE == "del"))].tolist()
         return (len(high_quality_snps), len(htz_snps), len(indels))
     else:
         logger.debug("FILE " + filename + " NOT FOUND")
