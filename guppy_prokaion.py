@@ -91,6 +91,9 @@ def get_arguments():
     parser.add_argument("-q", "--min_base_quality", type=int, dest="min_quality", required=False,
                         default=8, help="Filter on a minimum average read quality score. Default: 8")
 
+    parser.add_argument("-rq", "--min_read_quality", type=int, dest="min_read_quality",
+                             required=False, default=8, help="Filter on a minimum average read quality score. Default: 8")
+
     parser.add_argument("--length", type=int, dest="length", required=False,
                         default=500, help="Filter on a minimum read length. Default: 500bp")
 
@@ -185,6 +188,11 @@ def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_
 
     # --min_score_barcode_front: Minimum score to consider a front barcode to be a valid barcode alignment (Default: 60).
     # --min_score_barcode_rear: Minimum score to consider a rear barcode to be a valid alignment (and min_score_front will then be used for the front only when this is set).
+
+    # if args.gpu != False:
+    #     gpu_device = "-x auto "
+    # else:
+    #     gpu_device = ""
 
     if require_barcodes_both_ends:
         logger.info(

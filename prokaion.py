@@ -93,7 +93,7 @@ def get_arguments():
 
     basecall_group.add_argument('--basecall', type=str, default='dorado', required=True, help="REQUIRED. Program to use in data preprocessing (basecaller and barcoder)")
 
-    basecall_group.add_argument('--model', type=str, default='~/Scripts/git_repos/Dorado/Models/dna_r9.4.1_e8_sup@v3.6', required=False, help='The basecaller model to run')
+    basecall_group.add_argument('--model', type=str, default='~/Scripts/git_repos/Dorado/Models/dna_r10.4.1_e8.2_400bps_hac@v4.2.0', required=False, help='The basecaller model to run')
 
     basecall_group.add_argument('-C', '--config', type=str, default='dna_r9.4.1_450bps_fast.cfg', required=False,
                              help='REQUIRED. Config parameter for guppy_basecalling [fast|hac|sup]. Default: dna_r9.4.1_450bps_fast.cfg | dna_r10.4_e8.1_fast.cfg"')
@@ -327,6 +327,11 @@ def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_
 
     # --min_score_barcode_front: Minimum score to consider a front barcode to be a valid barcode alignment (Default: 60).
     # --min_score_barcode_rear: Minimum score to consider a rear barcode to be a valid alignment (and min_score_front will then be used for the front only when this is set).
+
+    # if args.gpu != False:
+    #     gpu_device = '-x auto '
+    # else:
+    #     gpu_device = ''
 
     if require_barcodes_both_ends:
         logger.info(
