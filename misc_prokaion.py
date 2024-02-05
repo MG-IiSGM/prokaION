@@ -1089,7 +1089,7 @@ def checkAA(snpEffRow, dfAnnot, gene):
             if ":" in row.annot:
                 annot_split = row.annot.split(":")
                 if row.aa in snpEffRow and annot_split[0] in gene:
-                    return row.aaAnnot
+                    return annot_split[-1]
     else:
         annotation_list = np.array(df.aaAnnot.tolist())
         return (',').join(annotation_list[np.array(presence_list)])
