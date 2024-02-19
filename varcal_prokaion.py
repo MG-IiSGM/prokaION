@@ -268,6 +268,13 @@ def freebayes_variant(reference, filename_bam_out, output_vcf, threads=36, frequ
     # print(cmd_bayes)
     execute_subprocess(cmd_bayes, isShell=True)
 
+def freebayes(reference, filename_bam_out, output_vcf, frequency=0.1, ploidy=1, base_qual=7, map_qual=60):
+
+    cmd_bayes = "freebayes -f {} --haplotype-length 0 --use-best-n-alleles 1 --min-alternate-count 0 --min-alternate-fraction {} -p {} --min-coverage 1 -q {} -m {} --strict-vcf {} > {}".format(
+        reference, str(frequency), str(ploidy), str(base_qual), str(map_qual), filename_bam_out, output_vcf)
+    # print(cmd_bayes)
+    execute_subprocess(cmd_bayes, isShell=True)
+
 
 def bcftool_filter(output_raw_vcf, output_vcf):
     """
@@ -561,8 +568,12 @@ if __name__ == "__main__":
                 else:
                     logger.info(
                         GREEN + "Starting Variant Calling for sample " + filename_out + END_FORMATTING)
-                    freebayes_variant(args.reference, filename_bam_out, output_raw_vcf, threads=args.threads,
+                    if args.amplicon:
+                        freebayes(args.reference, filename_bam_out, output_raw_vcf,
                                       frequency=args.min_allele_frequency, ploidy=args.ploidy, base_qual=args.min_quality, map_qual=args.min_mapping)
+                    else:
+                        freebayes_variant(args.reference, filename_bam_out, output_raw_vcf, threads=args.threads,
+                                        frequency=args.min_allele_frequency, ploidy=args.ploidy, base_qual=args.min_quality, map_qual=args.min_mapping)
 
                 after = datetime.datetime.now()
                 print(("Done with function freebayes_variant in: %s" %
