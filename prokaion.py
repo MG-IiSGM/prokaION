@@ -5,6 +5,7 @@ import os
 import sys
 import re
 import logging
+import shutil
 
 
 # Third party imports
@@ -118,6 +119,9 @@ def get_arguments():
 
     basecall_group.add_argument("-rq", "--min_read_quality", type=int, dest="min_read_quality",
                              required=False, default=8, help="Filter on a minimum average read quality score. Default: 8")
+
+    basecall_group.add_argument("--trim", type=str, dest="trim",
+                             required=False, default="primers", help="Specify what to trim. Options are 'none', 'all', 'adapters', and 'primers'. Choose 'adapters' to just trim adapters. The 'primers' choice will trim adapters and primers, but not barcodes. The 'none' choice is equivelent to using --no-trim. Default: primers")
 
     basecall_group.add_argument("--headcrop", type=int, dest="headcrop", required=False,
                              default=20, help="Trim n nucleotides from start of read. Default: 20")
@@ -268,10 +272,44 @@ def basecalling_dorado(input_dir, out_basecalling_dir):
 
     fastq_basecalled = os.path.join(out_basecalling_dir, 'Dorado_basecalled.fastq')
 
-    cmd_basecalling = "dorado basecaller {} {} --emit-fastq > {}".format(str(args.model), input_dir, fastq_basecalled)
+    cmd_basecalling = "dorado basecaller {} {} --trim {} --emit-fastq > {}".format(str(args.model), input_dir, args.trim, fastq_basecalled)
 
     print(cmd_basecalling)
     execute_subprocess(cmd_basecalling, isShell=True)
+
+
+def demux_dorado(fastq_basecalled, out_barcoding_dir, require_barcodes_both_ends=False, barcode_kit="EXP-NBD104"):
+
+    if require_barcodes_both_ends:
+        logger.info(
+            GREEN + BOLD + "Barcodes are being used at both ends" + END_FORMATTING + "\n")
+        require_barcodes_both_ends = "--barcode-both-ends"
+    else:
+        logger.info(
+            YELLOW + BOLD + "Barcodes are being used on at least 1 of the ends" + END_FORMATTING + "\n")
+        require_barcodes_both_ends = ""
+
+    cmd_demux = "dorado demux {} --kit-name {} --output-dir {} --emit-fastq".format(fastq_basecalled, barcode_kit, out_barcoding_dir)
+
+    print(cmd_demux)
+    execute_subprocess(cmd_demux, isShell=True)
+
+
+def reorganize_demux(out_barcoding_dir):
+
+    for filename in os.listdir(out_barcoding_dir):
+        if filename.endswith('.fastq'):
+            fastq_file_path = os.path.join(out_barcoding_dir, filename)
+            with open(fastq_file_path, 'rb') as f_in:
+                with gzip.open(os.path.join(out_barcoding_dir, filename + '.gz'), 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            os.remove(fastq_file_path)
+
+            if 'barcode' in filename:
+                barcode_folder = os.path.join(out_barcoding_dir, filename.split('_')[1].split('.')[0])
+                os.makedirs(barcode_folder, exist_ok=True)
+                shutil.move(os.path.join(out_barcoding_dir, filename + '.gz'), barcode_folder)
+
 
 def basecalling_ion(input_dir, out_basecalling_dir, config='dna_r9.4.1_450bps_fast.cfg', records=0):
 
@@ -474,6 +512,14 @@ def freebayes_variant(reference, filename_bam_out, output_vcf, threads=36, frequ
     execute_subprocess(cmd_bayes, isShell=True)
 
 
+def freebayes(reference, filename_bam_out, output_vcf, frequency=0.1, ploidy=1, base_qual=7, map_qual=60):
+
+    cmd_bayes = "freebayes -f {} --haplotype-length 0 --use-best-n-alleles 1 --min-alternate-count 0 --min-alternate-fraction {} -p {} --min-coverage 1 -q {} -m {} --strict-vcf {} > {}".format(
+        reference, str(frequency), str(ploidy), str(base_qual), str(map_qual), filename_bam_out, output_vcf)
+    # print(cmd_bayes)
+    execute_subprocess(cmd_bayes, isShell=True)
+
+
 def bcftool_filter(output_raw_vcf, output_vcf):
     """
     https://samtools.github.io/bcftools/bcftools.html
@@ -538,6 +584,8 @@ if __name__ == "__main__":
         out_barcoding_dir, "barcoding_summary.txt")
     out_samples_dir = os.path.join(input_dir, "Samples_Fastq")
     check_create_dir(out_samples_dir)
+    fastq_basecalled = os.path.join(out_basecalling_dir, 'Dorado_basecalled.fastq')
+    unclassified_fastq = os.path.join(out_barcoding_dir, 'unclassified.fastq.gz')
     # out_samples_filtered_dir = os.path.join(out_samples_dir, "Filtered_Fastq")
     # check_create_dir(out_samples_filtered_dir)
     # out_correction_dir = os.path.join(out_samples_dir, 'Corrected')
@@ -642,34 +690,24 @@ if __name__ == "__main__":
 
         logger.info("\n" + GREEN + "STARTING BASECALLING WITH DORADO" + END_FORMATTING + "\n")
 
-        fastq_basecalled = os.path.join(out_basecalling_dir, 'Dorado_basecalled.fastq')
-
-        if any(file.endswith('.fast5') for file in os.listdir(args.input_dir)):
-
-            out_pod5_dir = os.path.join(input_dir, "Pod5")
-            check_create_dir(out_pod5_dir)
-
-            if os.path.isfile(fastq_basecalled):
-                logger.info("\n" + YELLOW + BOLD + "Ommiting BASECALLING" + END_FORMATTING + "\n")
-
-            else:
-                pod5_conversion(input_dir, out_pod5_dir)
-
-                basecalling_dorado(out_pod5_dir, out_basecalling_dir)
-
-        elif any(file.endswith('.pod5') for file in os.listdir(args.input_dir)):
-
-            if os.path.isfile(fastq_basecalled):
-                logger.info("\n" + YELLOW + BOLD + "Ommiting BASECALLING" + END_FORMATTING + "\n")
-
-            else:
-                basecalling_dorado(input_dir, out_basecalling_dir)
+        if os.path.exists(fastq_basecalled):
+            logger.info("\n" + YELLOW + BOLD +
+                        "Ommiting BASECALLING" + END_FORMATTING + "\n")
 
         else:
-            sys.exit(f"Error: The files in {input_dir} are not in .fast5 or pod5 format")
+            if any(file.endswith('.fast5') for file in os.listdir(args.input_dir)):
+                out_pod5_dir = os.path.join(input_dir, "Pod5")
+                check_create_dir(out_pod5_dir)
+                pod5_conversion(input_dir, out_pod5_dir)
+                basecalling_dorado(out_pod5_dir, out_basecalling_dir)
 
-        after = datetime.datetime.now()
-        print(("Done with function basecalling_dorado in: %s" % (after - prior) + "\n"))
+            elif any(file.endswith('.pod5') for file in os.listdir(args.input_dir)):
+                    basecalling_dorado(input_dir, out_basecalling_dir)
+
+            else:
+                sys.exit(f"Error: The files in {input_dir} are not in .fast5 or pod5 format")
+            after = datetime.datetime.now()
+            print(("Done with function basecalling_dorado in: %s" % (after - prior) + "\n"))
 
     # Guppy
 
@@ -680,7 +718,6 @@ if __name__ == "__main__":
         logger.info("\n" + GREEN + "STARTING BASECALLING WITH GUPPY" + END_FORMATTING + "\n")
 
         if any(file.endswith('.fast5') for file in os.listdir(args.input_dir)):
-
             if os.path.isfile(basecalling_summary):
                 logger.info("\n" + YELLOW + BOLD + "Ommiting BASECALLING" + END_FORMATTING + "\n")
 
@@ -702,21 +739,48 @@ if __name__ == "__main__":
 
     # Barcoding
 
-    prior = datetime.datetime.now()
+    ## Dorado
 
-    logger.info("\n" + GREEN + BOLD + "STARTING BARCODING" + END_FORMATTING)
+    if args.basecall == 'dorado':
 
-    if os.path.isfile(barcoding_summary):
-        logger.info("\n" + YELLOW + BOLD +
-                    "Ommiting BARCODING/DEMULTIPLEX" + END_FORMATTING + "\n")
-    else:
-        logger.info("\n" + GREEN +
-                    "STARTING BARCODING/DEMULTIPLEX" + END_FORMATTING + "\n")
-        barcoding_ion(out_basecalling_dir, out_barcoding_dir, barcode_kit=args.barcode_kit,
-                      threads=args.threads, require_barcodes_both_ends=args.require_barcodes_both_ends)
+        prior = datetime.datetime.now()
 
-    after = datetime.datetime.now()
-    print(("Done with function barcoding_ion in: %s" % (after - prior) + "\n"))
+        logger.info("\n" + GREEN + BOLD + "STARTING BARCODING" + END_FORMATTING)
+
+        if os.path.exists(unclassified_fastq):
+            logger.info("\n" + YELLOW + BOLD +
+                        "Ommiting BARCODING/DEMULTIPLEX" + END_FORMATTING + "\n")
+
+        else:
+            logger.info("\n" + GREEN +
+                        "STARTING BARCODING/DEMULTIPLEX" + END_FORMATTING + "\n")
+            demux_dorado(fastq_basecalled, out_barcoding_dir, barcode_kit=args.barcode_kit, require_barcodes_both_ends=args.require_barcodes_both_ends)
+            reorganize_demux(out_barcoding_dir)
+
+        after = datetime.datetime.now()
+        print(("Done with function demux_dorado & reorganize_demux in: %s" % (after - prior) + "\n"))
+
+    ## Guppy
+
+    elif args.basecall == 'guppy':
+
+        prior = datetime.datetime.now()
+
+        logger.info("\n" + GREEN + BOLD + "STARTING BARCODING" + END_FORMATTING)
+
+        if os.path.isfile(barcoding_summary):
+            logger.info("\n" + YELLOW + BOLD +
+                        "Ommiting BARCODING/DEMULTIPLEX" + END_FORMATTING + "\n")
+
+        else:
+            logger.info("\n" + GREEN +
+                        "STARTING BARCODING/DEMULTIPLEX" + END_FORMATTING + "\n")
+            barcoding_ion(out_basecalling_dir, out_barcoding_dir, barcode_kit=args.barcode_kit,
+                        threads=args.threads, require_barcodes_both_ends=args.require_barcodes_both_ends)
+
+        after = datetime.datetime.now()
+        print(("Done with function barcoding_ion in: %s" % (after - prior) + "\n"))
+
 
     # Read Filtering
 
@@ -1023,8 +1087,12 @@ if __name__ == "__main__":
                 else:
                     logger.info(
                         GREEN + "Starting Variant Calling for sample " + filename_out + END_FORMATTING)
-                    freebayes_variant(args.reference, filename_bam_out, output_raw_vcf, threads=args.threads,
+                    if args.amplicon:
+                        freebayes(args.reference, filename_bam_out, output_raw_vcf,
                                       frequency=args.min_allele_frequency, ploidy=args.ploidy, base_qual=args.min_quality, map_qual=args.min_mapping)
+                    else:
+                        freebayes_variant(args.reference, filename_bam_out, output_raw_vcf, threads=args.threads,
+                                        frequency=args.min_allele_frequency, ploidy=args.ploidy, base_qual=args.min_quality, map_qual=args.min_mapping)
 
                 after = datetime.datetime.now()
                 print(("Done with function freebayes_variant in: %s" %

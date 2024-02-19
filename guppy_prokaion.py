@@ -8,6 +8,7 @@ import sys
 import subprocess
 import datetime
 import gzip
+import shutil
 
 # Local application imports
 
@@ -94,6 +95,9 @@ def get_arguments():
     parser.add_argument("-rq", "--min_read_quality", type=int, dest="min_read_quality",
                              required=False, default=8, help="Filter on a minimum average read quality score. Default: 8")
 
+    parser.add_argument("--trim", type=str, dest="trim",
+                             required=False, default="primers", help="Specify what to trim. Options are 'none', 'all', 'adapters', and 'primers'. Choose 'adapters' to just trim adapters. The 'primers' choice will trim adapters and primers, but not barcodes. The 'none' choice is equivelent to using --no-trim. Default: primers")
+
     parser.add_argument("--length", type=int, dest="length", required=False,
                         default=500, help="Filter on a minimum read length. Default: 500bp")
 
@@ -128,10 +132,43 @@ def basecalling_dorado(input_dir, out_basecalling_dir):
 
     fastq_basecalled = os.path.join(out_basecalling_dir, 'Dorado_basecalled.fastq')
 
-    cmd_basecalling = "dorado basecaller {} {} --emit-fastq > {}".format(str(args.model), input_dir, fastq_basecalled)
+    cmd_basecalling = "dorado basecaller {} {} --trim {} --emit-fastq > {}".format(str(args.model), input_dir, args.trim, fastq_basecalled)
 
     print(cmd_basecalling)
     execute_subprocess(cmd_basecalling, isShell=True)
+
+
+def demux_dorado(fastq_basecalled, out_barcoding_dir, require_barcodes_both_ends=False, barcode_kit="EXP-NBD104"):
+
+    if require_barcodes_both_ends:
+        logger.info(
+            GREEN + BOLD + "Barcodes are being used at both ends" + END_FORMATTING + "\n")
+        require_barcodes_both_ends = "--barcode-both-ends"
+    else:
+        logger.info(
+            YELLOW + BOLD + "Barcodes are being used on at least 1 of the ends" + END_FORMATTING + "\n")
+        require_barcodes_both_ends = ""
+
+    cmd_demux = "dorado demux {} --kit-name {} --output-dir {} --emit-fastq".format(fastq_basecalled, barcode_kit, out_barcoding_dir)
+
+    print(cmd_demux)
+    execute_subprocess(cmd_demux, isShell=True)
+
+
+def reorganize_demux(out_barcoding_dir):
+
+    for filename in os.listdir(out_barcoding_dir):
+        if filename.endswith('.fastq'):
+            fastq_file_path = os.path.join(out_barcoding_dir, filename)
+            with open(fastq_file_path, 'rb') as f_in:
+                with gzip.open(os.path.join(out_barcoding_dir, filename + '.gz'), 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            os.remove(fastq_file_path)
+
+            if 'barcode' in filename:
+                barcode_folder = os.path.join(out_barcoding_dir, filename.split('_')[1].split('.')[0])
+                os.makedirs(barcode_folder, exist_ok=True)
+                shutil.move(os.path.join(out_barcoding_dir, filename + '.gz'), barcode_folder)
 
 
 def basecalling_ion(input_dir, out_basecalling_dir, config='dna_r9.4.1_450bps_fast.cfg', records=0):
@@ -305,6 +342,7 @@ if __name__ == "__main__":
     check_create_dir(out_samples_dir)
     out_samples_filtered_dir = os.path.join(out_samples_dir, "Filtered_Fastq")
     check_create_dir(out_samples_filtered_dir)
+    fastq_basecalled = os.path.join(out_basecalling_dir, 'Dorado_basecalled.fastq')
     # out_correction_dir = os.path.join(out_samples_dir, 'Corrected')
     # check_create_dir(out_correction_dir)
     out_qc_dir = os.path.join(output_dir, "Quality")
@@ -328,7 +366,9 @@ if __name__ == "__main__":
 
     ############### START PIPELINE ###############
 
-    # Dorado
+    # Basecalling #
+
+    ### Dorado
 
     if args.basecall == 'dorado':
 
@@ -336,26 +376,34 @@ if __name__ == "__main__":
 
         logger.info("\n" + GREEN + "STARTING BASECALLING WITH DORADO" + END_FORMATTING + "\n")
 
-        if any(file.endswith('.fast5') for file in os.listdir(args.input_dir)):
+        if os.path.exists(fastq_basecalled):
 
-            out_pod5_dir = os.path.join(output_dir, "Pod5")
-            check_create_dir(out_pod5_dir)
-
-            pod5_conversion(input_dir, out_pod5_dir)
-
-            basecalling_dorado(out_pod5_dir, out_basecalling_dir)
-
-        elif any(file.endswith('.pod5') for file in os.listdir(args.input_dir)):
-
-            basecalling_dorado(input_dir, out_basecalling_dir)
+            logger.info("\n" + YELLOW + BOLD +
+                        "Ommiting BASECALLING" + END_FORMATTING + "\n")
 
         else:
-            sys.exit(f"Error: The files in {input_dir} are not in .fast5 or pod5 format")
 
-        after = datetime.datetime.now()
-        print(("Done with function basecalling_dorado in: %s" % (after - prior) + "\n"))
+            if any(file.endswith('.fast5') for file in os.listdir(args.input_dir)):
 
-    # Guppy
+                out_pod5_dir = os.path.join(input_dir, "Pod5")
+                check_create_dir(out_pod5_dir)
+
+                pod5_conversion(input_dir, out_pod5_dir)
+
+                basecalling_dorado(out_pod5_dir, out_basecalling_dir)
+
+            elif any(file.endswith('.pod5') for file in os.listdir(args.input_dir)):
+
+                basecalling_dorado(input_dir, out_basecalling_dir)
+
+            else:
+                sys.exit(f"Error: The files in {input_dir} are not in .fast5 or pod5 format")
+
+            after = datetime.datetime.now()
+            print(("Done with function basecalling_dorado in: %s" % (after - prior) + "\n"))
+
+
+    ### Guppy
 
     elif args.basecall == 'guppy':
 
@@ -383,23 +431,50 @@ if __name__ == "__main__":
         after = datetime.datetime.now()
         print(("Done with function basecalling_ion in: %s" % (after - prior) + "\n"))
 
-    # Barcoding
 
-    prior = datetime.datetime.now()
+    # Barcoding #
 
-    logger.info("\n" + GREEN + BOLD + "STARTING BARCODING" + END_FORMATTING)
+    ## Dorado
 
-    if os.path.isfile(barcoding_summary):
-        logger.info("\n" + YELLOW + BOLD +
-                    "Ommiting BARCODING/DEMULTIPLEX" + END_FORMATTING + "\n")
-    else:
-        logger.info("\n" + GREEN +
-                    "STARTING BARCODING/DEMULTIPLEX" + END_FORMATTING + "\n")
-        barcoding_ion(out_basecalling_dir, out_barcoding_dir, barcode_kit=args.barcode_kit,
-                      threads=args.threads, require_barcodes_both_ends=args.require_barcodes_both_ends)
+    if args.basecall == 'dorado':
 
-    after = datetime.datetime.now()
-    print(("Done with function barcoding_ion in: %s" % (after - prior) + "\n"))
+        prior = datetime.datetime.now()
+
+        logger.info("\n" + GREEN + BOLD + "STARTING BARCODING" + END_FORMATTING)
+
+        if "unclassified.fastq" in os.listdir(out_barcoding_dir):
+            logger.info("\n" + YELLOW + BOLD +
+                        "Ommiting BARCODING/DEMULTIPLEX" + END_FORMATTING + "\n")
+        else:
+            logger.info("\n" + GREEN +
+                        "STARTING BARCODING/DEMULTIPLEX" + END_FORMATTING + "\n")
+            demux_dorado(fastq_basecalled, out_barcoding_dir, barcode_kit=args.barcode_kit, require_barcodes_both_ends=args.require_barcodes_both_ends)
+            reorganize_demux(out_barcoding_dir)
+
+        after = datetime.datetime.now()
+        print(("Done with function demux_dorado & reorganize_demux in: %s" % (after - prior) + "\n"))
+
+
+    ## Guppy
+
+    elif args.basecall == 'guppy':
+
+        prior = datetime.datetime.now()
+
+        logger.info("\n" + GREEN + BOLD + "STARTING BARCODING" + END_FORMATTING)
+
+        if os.path.isfile(barcoding_summary):
+            logger.info("\n" + YELLOW + BOLD +
+                        "Ommiting BARCODING/DEMULTIPLEX" + END_FORMATTING + "\n")
+        else:
+            logger.info("\n" + GREEN +
+                        "STARTING BARCODING/DEMULTIPLEX" + END_FORMATTING + "\n")
+            barcoding_ion(out_basecalling_dir, out_barcoding_dir, barcode_kit=args.barcode_kit,
+                        threads=args.threads, require_barcodes_both_ends=args.require_barcodes_both_ends)
+
+        after = datetime.datetime.now()
+        print(("Done with function barcoding_ion in: %s" % (after - prior) + "\n"))
+
 
     # Read Filtering
 
