@@ -481,7 +481,7 @@ def calculate_cov_stats(file_cov):
     df = pd.read_csv(file_cov, sep="\t", names=["#CHROM", "POS", "COV"])
     unmapped_pos = len(df.POS[df.COV == 0].tolist())
     pos_0_10 = len(df.POS[(df.COV > 0) & (df.COV <= 10)].tolist())
-    pos_10_20 = len(df.POS[(df.COV > 10) & (df.COV <= 20)].tolist())
+    pos_high10 = len(df.POS[(df.COV > 10)].tolist())
     pos_high20 = len(df.POS[(df.COV > 20)].tolist())
     pos_high50 = len(df.POS[(df.COV > 50)].tolist())
     pos_high100 = len(df.POS[(df.COV >= 100)].tolist())
@@ -490,7 +490,7 @@ def calculate_cov_stats(file_cov):
     total_pos = df.shape[0]
     unmapped_prop = "%.2f" % ((unmapped_pos / total_pos) * 100)
     prop_0_10 = "%.2f" % ((pos_0_10 / total_pos) * 100)
-    prop_10_20 = "%.2f" % ((pos_10_20 / total_pos) * 100)
+    prop_high10 = "%.2f" % ((pos_high10 / total_pos) * 100)
     prop_high20 = "%.2f" % ((pos_high20 / total_pos) * 100)
     prop_high50 = "%.2f" % ((pos_high50 / total_pos) * 100)
     prop_high100 = "%.2f" % ((pos_high100 / total_pos) * 100)
@@ -499,7 +499,7 @@ def calculate_cov_stats(file_cov):
 
     mean_cov = "%.2f" % (df.COV.mean())
 
-    return (sample, mean_cov, unmapped_prop, prop_0_10, prop_10_20, prop_high20, prop_high50, prop_high100, prop_high500, prop_high1000)
+    return (sample, mean_cov, unmapped_prop, prop_0_10, prop_high10, prop_high20, prop_high50, prop_high100, prop_high500, prop_high1000)
 
 
 def obtain_group_cov_stats(directory, group_name):
@@ -519,7 +519,7 @@ def obtain_group_cov_stats(directory, group_name):
                      (",").join(str(samples_to_skip)))
 
     columns = ["#SAMPLE", "MEAN_COV", "UNMAPPED_PROP", "COV1-10X",
-               "COV10-20X", "COV>20X", "COV>50X", "COV>100X", "COV>500X", "COV>1000X"]
+               "COV>10X", "COV>20X", "COV>50X", "COV>100X", "COV>500X", "COV>1000X"]
 
     files_list = []
 
@@ -658,7 +658,7 @@ def obtain_overal_stats(out_stats_dir, output_dir, group):
     out_consensus_dir = os.path.join(output_dir, "Consensus")
 
     columns = ["#SAMPLE", "MEAN_COV", "UNMAPPED_PROP", "COV1-10X",
-               "COV10-20X", "COV>20X", "COV>50X", "COV>100X", "COV>500X", "COV>1000X"]
+               "COV>10X", "COV>20X", "COV>50X", "COV>100X", "COV>500X", "COV>1000X"]
 
     if os.path.exists(overal_stat_file):
         previous_stat = True
@@ -687,11 +687,11 @@ def obtain_overal_stats(out_stats_dir, output_dir, group):
     if previous_stat:
         df = pd.concat([df_stat, df], ignore_index=True, sort=True)
         df = df[columns + [col for col in df.columns if col != "#SAMPLE" and col != "MEAN_COV" and col != "UNMAPPED_PROP" and col !=
-                           "COV1-10X" and col != "COV10-20X" and col != "COV>20X" and col != "COV>50X" and col != "COV>100X" and col != "COV>500X" and col != "COV>1000X"]]
+                           "COV1-10X" and col != "COV>10X" and col != "COV>20X" and col != "COV>50X" and col != "COV>100X" and col != "COV>500X" and col != "COV>1000X"]]
         df.to_csv(overal_stat_file, sep="\t", index=False)
     else:
         df = df[columns + [col for col in df.columns if col != "#SAMPLE" and col != "MEAN_COV" and col != "UNMAPPED_PROP" and col !=
-                           "COV1-10X" and col != "COV10-20X" and col != "COV>20X" and col != "COV>50X" and col != "COV>100X" and col != "COV>500X" and col != "COV>1000X"]]
+                           "COV1-10X" and col != "COV>10X" and col != "COV>20X" and col != "COV>50X" and col != "COV>100X" and col != "COV>500X" and col != "COV>1000X"]]
         df.to_csv(overal_stat_file, sep="\t", index=False)
 
 

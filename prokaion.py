@@ -23,7 +23,7 @@ from misc_prokaion import (check_create_dir, check_file_exists, extract_read_lis
                            create_coverage, obtain_group_cov_stats, obtain_overal_stats, ivar_consensus, replace_consensus_header, remove_low_quality, rename_reference_snpeff, annotate_snpeff, user_annotation, user_annotation_aa, make_blast, kraken, mash_screen)
 
 from compare_snp_prokaion import (ddbb_create_intermediate, recalibrate_ddbb_vcf_intermediate,
-                                  remove_position_range, extract_complex_list, revised_df, ddtb_compare, remove_bed_positions, extract_only_snps, extract_bed_positions)
+                                  remove_position_range, extract_complex_list, revised_df, ddtb_compare, remove_bed_positions, extract_only_snps, extract_bed_positions, extract_lowcov)
 
 
 """
@@ -94,10 +94,7 @@ def get_arguments():
 
     basecall_group.add_argument('--basecall', type=str, default='dorado', required=True, help="REQUIRED. Program to use in data preprocessing (basecaller and barcoder)")
 
-    basecall_group.add_argument('--model', type=str, default='~/Scripts/git_repos/Dorado/Models/dna_r10.4.1_e8.2_400bps_hac@v4.2.0', required=False, help='The basecaller model to run')
-
-    basecall_group.add_argument('-C', '--config', type=str, default='dna_r9.4.1_450bps_fast.cfg', required=False,
-                             help='REQUIRED. Config parameter for guppy_basecalling [fast|hac|sup]. Default: dna_r9.4.1_450bps_fast.cfg | dna_r10.4_e8.1_fast.cfg"')
+    basecall_group.add_argument('--model', type=str, default='~/Scripts/git_repos/Dorado/Models/dna_r10.4.1_e8.2_400bps_hac@v4.3.0', required=False, help='The basecaller model to run. Default dna_r10.4.1_e8.2_400bps_hac@v4.3.0 | dna_r10.4_e8.1_hac.cfg')
 
     basecall_group.add_argument('-b', '--require_barcodes_both_ends', required=False, action='store_true',
                              help='Require barcodes at both ends. By default it only requires the barcode at one end for the sequences identification')
@@ -289,7 +286,7 @@ def demux_dorado(fastq_basecalled, out_barcoding_dir, require_barcodes_both_ends
             YELLOW + BOLD + "Barcodes are being used on at least 1 of the ends" + END_FORMATTING + "\n")
         require_barcodes_both_ends = ""
 
-    cmd_demux = "dorado demux {} --kit-name {} --output-dir {} --emit-fastq".format(fastq_basecalled, barcode_kit, out_barcoding_dir)
+    cmd_demux = "dorado demux {} --kit-name {} --output-dir {} --emit-fastq {} --emit-summary".format(fastq_basecalled, barcode_kit, out_barcoding_dir, require_barcodes_both_ends)
 
     print(cmd_demux)
     execute_subprocess(cmd_demux, isShell=True)
@@ -381,7 +378,7 @@ def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_
         require_barcodes_both_ends = ""
 
     cmd = ["guppy_barcoder", "-i", out_basecalling_dir, "-s", out_barcoding_dir, "-r", require_barcodes_both_ends,
-           "--barcode_kits", barcode_kit, "-t", str(threads), '--num_barcoding_threads', str(threads), '--detect_barcodes', '--min_score_barcode_front', str(85), '--min_score_barcode_rear', str(85), '--enable_trim_barcodes', '--detect_mid_strand_barcodes', '--min_score_barcode_mid', str(90), '--detect_primer', '--trim_primers', '--detect_adapter', '--trim_adapters', "--fastq_out", "--compress_fastq"]
+           "--barcode_kits", barcode_kit, "-t", str(threads), '--detect_barcodes', '--min_score_barcode_front', str(85), '--min_score_barcode_rear', str(85), '--enable_trim_barcodes', '--detect_mid_strand_barcodes', '--min_score_barcode_mid', str(90), '--detect_primer', '--trim_primers', '--detect_adapter', '--trim_adapters', "--fastq_out", "--compress_fastq"]
 
     print(cmd)
     execute_subprocess(cmd, isShell=False)
@@ -722,7 +719,7 @@ if __name__ == "__main__":
                 logger.info("\n" + YELLOW + BOLD + "Ommiting BASECALLING" + END_FORMATTING + "\n")
 
             else:
-                basecalling_ion(input_dir, out_basecalling_dir, config=args.config, records=args.records_per_fastq)
+                basecalling_ion(input_dir, out_basecalling_dir, config=args.model, records=args.records_per_fastq)
 
             for root, _, files in os.walk(out_basecalling_dir):
                 for name in files:
@@ -1490,6 +1487,18 @@ if __name__ == "__main__":
     print(("Done with function remove_position_range in: %s" %
            (after - prior) + "\n"))
 
+    # Extract all low coverage o not covered positions
+
+    prior = datetime.datetime.now()
+
+    symbol_file = full_path_compare + '_symbol_lowcov.tsv'
+    symbol_lowcov = extract_lowcov(compare_snp_matrix_INDEL_intermediate) # It is made by the INDEL_intermediate.tsv, taking 0 and 1 into account, can also be made with intermediate.highfreq.tsv
+    symbol_lowcov.to_csv(symbol_file, sep='\t', index=False)
+
+    after = datetime.datetime.now()
+    print(("Done with function extract_lowcov in: %s" %
+               (after - prior) + "\n"))
+
     # Extract all positions marked as complex
 
     prior = datetime.datetime.now()
@@ -1508,8 +1517,11 @@ if __name__ == "__main__":
 
     recalibrated_revised_INDEL_df = revised_df(compare_snp_matrix_INDEL_intermediate_df, path_compare, complex_pos=complex_variants, min_freq_include=0.7, min_threshold_discard_uncov_sample=args.min_threshold_discard_uncov_sample, min_threshold_discard_uncov_pos=args.min_threshold_discard_uncov_pos, min_threshold_discard_htz_sample=args.min_threshold_discard_htz_sample,
                                                min_threshold_discard_htz_pos=args.min_threshold_discard_htz_pos, min_threshold_discard_all_pos=args.min_threshold_discard_all_pos, min_threshold_discard_all_sample=args.min_threshold_discard_all_sample, remove_faulty=True, drop_samples=True, drop_positions=True, windows_size_discard=args.window)
-    recalibrated_revised_INDEL_df.to_csv(
-        compare_snp_matrix_recal, sep='\t', index=False)
+
+    recalibrated_revised_df = recalibrated_revised_INDEL_df[~recalibrated_revised_INDEL_df['Position'].isin(symbol_lowcov['Position'])]
+
+    recalibrated_revised_df.to_csv(
+            compare_snp_matrix_recal, sep='\t', index=False)
 
     if args.only_snp:
         compare_only_snps_df = extract_only_snps(
