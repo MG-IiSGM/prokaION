@@ -771,6 +771,36 @@ def revised_df(df, out_dir=False, complex_pos=False, min_freq_include=0.7, min_t
     return df
 
 
+def extract_lowcov(intermediate_df):
+    df = pd.read_csv(intermediate_df, sep='\t')
+
+    # Replace Htz with 1
+    # IF HANDLE HETEROZYGOUS CHANGE THIS 0 for X or 0.5
+    def fn(x):
+        if isinstance(x, (int, float)):
+            return 1 if x > 0.5 else 0
+        else:
+            return x
+
+    df.iloc[:, 3:] = df.iloc[:, 3:].applymap(lambda x: fn(float(x)) if isinstance(x, str) and x.replace('.', '', 1).isdigit() else x)
+
+    # Crear un nuevo DataFrame para almacenar las filas filtradas
+    df_symbol = pd.DataFrame(columns=df.columns)
+
+    # Iterar sobre las filas del DataFrame
+    for index, row in df.iterrows():
+        # Filtrar los elementos diferentes de '!' y '?'
+        filtered_row = [x for x in row[3:] if x not in ['!', '?']]
+        # Verificar si todos los elementos de la fila (excluyendo '?' y '!') son iguales
+        if len(set(filtered_row)) == 1:
+            # Añadir la fila al nuevo DataFrame
+            df_symbol = pd.concat([df_symbol, pd.DataFrame([row])], ignore_index=True)
+
+    df_symbol = df_symbol[df_symbol.apply(lambda row: ('!' in row.values) or ('?' in row.values), axis=1)]
+
+    return df_symbol
+
+
 def extract_only_snps(revised_df):
     df = pd.read_csv(revised_df, sep='\t')
     # df['ref'] = df['Position'].apply(lambda x: x.split('|')[1])
@@ -1267,6 +1297,18 @@ if __name__ == '__main__':
         print(("Done with function extract_complex_list in: %s" %
                (after - prior) + "\n"))
 
+        # Extract all low coverage o not covered positions
+
+        prior = datetime.datetime.now()
+
+        symbol_file = full_path_compare + '_symbol_lowcov.tsv'
+        symbol_lowcov = extract_lowcov(compare_snp_matrix_INDEL_intermediate) # It is made by the INDEL_intermediate.tsv, taking 0 and 1 into account, can also be made with intermediate.highfreq.tsv
+        symbol_lowcov.to_csv(symbol_file, sep='\t', index=False)
+
+        after = datetime.datetime.now()
+        print(("Done with function extract_lowcov in: %s" %
+               (after - prior) + "\n"))
+
         # Clean all faulty positions and samples for final table
 
         prior = datetime.datetime.now()
@@ -1278,7 +1320,10 @@ if __name__ == '__main__':
 
         recalibrated_revised_INDEL_df = revised_df(compare_snp_matrix_INDEL_intermediate_df, path_compare, complex_pos=remove_complex_positions, min_freq_include=0.7, min_threshold_discard_uncov_sample=args.min_threshold_discard_uncov_sample, min_threshold_discard_uncov_pos=args.min_threshold_discard_uncov_pos, min_threshold_discard_htz_sample=args.min_threshold_discard_htz_sample,
                                                    min_threshold_discard_htz_pos=args.min_threshold_discard_htz_pos, min_threshold_discard_all_pos=args.min_threshold_discard_all_pos, min_threshold_discard_all_sample=args.min_threshold_discard_all_sample, remove_faulty=True, drop_samples=True, drop_positions=True, windows_size_discard=args.window)
-        recalibrated_revised_INDEL_df.to_csv(
+
+        recalibrated_revised_df = recalibrated_revised_INDEL_df[~recalibrated_revised_INDEL_df['Position'].isin(symbol_lowcov['Position'])]
+
+        recalibrated_revised_df.to_csv(
             compare_snp_matrix_recal, sep='\t', index=False)
 
         if args.only_snp:

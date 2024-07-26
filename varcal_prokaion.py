@@ -115,8 +115,8 @@ def get_arguments():
     quality_group = parser.add_argument_group(
         "Quality parameters", "Parameters for diferent Quality conditions")
 
-    quality_group.add_argument('-c', '--coverage20', type=int, default=20, required=False,
-                               help='Minimum percentage of coverage at 20x to classify as uncovered. Default: 20')
+    quality_group.add_argument('-c', '--coverage20', type=int, default=70, required=False,
+                               help='Minimum percentage of coverage at 20x to classify as uncovered. Default: 70')
 
     quality_group.add_argument('-u', '--unmapped', type=int, default=50, required=False,
                                help='Minimum percentage of unmapped reads to classify as uncovered. Default: 50')
@@ -936,7 +936,7 @@ if __name__ == "__main__":
         prior = datetime.datetime.now()
 
         recalibrated_snp_matrix_intermediate = remove_bed_positions(
-            recalibrated_snp_matrix_intermediate, args.remove_bed)
+                recalibrated_snp_matrix_intermediate, args.remove_bed, full_path_compare)
 
         after = datetime.datetime.now()
         print(('\n' + "Done with function remove_bed_positions in: %s" %
