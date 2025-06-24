@@ -378,7 +378,7 @@ def barcoding_ion(out_basecalling_dir, out_barcoding_dir, require_barcodes_both_
         require_barcodes_both_ends = ""
 
     cmd = ["guppy_barcoder", "-i", out_basecalling_dir, "-s", out_barcoding_dir, "-r", require_barcodes_both_ends,
-           "--barcode_kits", barcode_kit, "-t", str(threads), '--detect_barcodes', '--min_score_barcode_front', str(85), '--min_score_barcode_rear', str(85), '--enable_trim_barcodes', '--detect_mid_strand_barcodes', '--min_score_barcode_mid', str(90), '--detect_primer', '--trim_primers', '--detect_adapter', '--trim_adapters', "--fastq_out"]
+           "--barcode_kits", barcode_kit, "-t", str(threads), '--detect_barcodes', '--min_score_barcode_front', str(85), '--min_score_barcode_rear', str(85), '--enable_trim_barcodes', '--detect_mid_strand_barcodes', '--min_score_barcode_mid', str(90), '--detect_primer', '--trim_primers', '--detect_adapter', '--trim_adapters']
 
     print(cmd)
     execute_subprocess(cmd, isShell=False)
