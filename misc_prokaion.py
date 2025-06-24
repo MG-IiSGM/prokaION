@@ -483,6 +483,7 @@ def calculate_cov_stats(file_cov):
     pos_0_10 = len(df.POS[(df.COV > 0) & (df.COV <= 10)].tolist())
     pos_high10 = len(df.POS[(df.COV > 10)].tolist())
     pos_high20 = len(df.POS[(df.COV > 20)].tolist())
+    pos_high30 = len(df.POS[(df.COV > 30)].tolist())
     pos_high50 = len(df.POS[(df.COV > 50)].tolist())
     pos_high100 = len(df.POS[(df.COV >= 100)].tolist())
     pos_high500 = len(df.POS[(df.COV >= 500)].tolist())
@@ -492,6 +493,7 @@ def calculate_cov_stats(file_cov):
     prop_0_10 = "%.2f" % ((pos_0_10 / total_pos) * 100)
     prop_high10 = "%.2f" % ((pos_high10 / total_pos) * 100)
     prop_high20 = "%.2f" % ((pos_high20 / total_pos) * 100)
+    prop_high30 = "%.2f" % ((pos_high30 / total_pos) * 100)
     prop_high50 = "%.2f" % ((pos_high50 / total_pos) * 100)
     prop_high100 = "%.2f" % ((pos_high100 / total_pos) * 100)
     prop_high500 = "%.2f" % ((pos_high500 / total_pos) * 100)
@@ -499,7 +501,7 @@ def calculate_cov_stats(file_cov):
 
     mean_cov = "%.2f" % (df.COV.mean())
 
-    return (sample, mean_cov, unmapped_prop, prop_0_10, prop_high10, prop_high20, prop_high50, prop_high100, prop_high500, prop_high1000)
+    return (sample, mean_cov, unmapped_prop, prop_0_10, prop_high10, prop_high20, prop_high30, prop_high50, prop_high100, prop_high500, prop_high1000)
 
 
 def obtain_group_cov_stats(directory, group_name):
@@ -519,7 +521,7 @@ def obtain_group_cov_stats(directory, group_name):
                      (",").join(str(samples_to_skip)))
 
     columns = ["#SAMPLE", "MEAN_COV", "UNMAPPED_PROP", "COV1-10X",
-               "COV>10X", "COV>20X", "COV>50X", "COV>100X", "COV>500X", "COV>1000X"]
+               "COV>10X", "COV>20X", "COV>30X", "COV>50X", "COV>100X", "COV>500X", "COV>1000X"]
 
     files_list = []
 
@@ -557,16 +559,16 @@ def extract_snp_count(out_variant_dir, filename_out):
     if os.path.exists(filename):
         df = pd.read_csv(filename, sep="\t")
         df = df.drop_duplicates(subset=["POS", "REF", "ALT"], keep="first")
-        high_quality_snps = df["POS"][(df.TOTAL_DP >= 20) & 
+        high_quality_snps = df["POS"][(df.TOTAL_DP >= 30) & 
                                       (df.ALT_FREQ >= 0.7) & 
                                       (df.TYPE == "snp") & 
                                       ~df.OLDVAR.isin(['complex', 'mnp'])].tolist()
-        htz_snps = df["POS"][(df.TOTAL_DP >= 20) & 
+        htz_snps = df["POS"][(df.TOTAL_DP >= 30) & 
                              (df.ALT_FREQ < 0.7) & 
                              (df.ALT_FREQ >= 0.3) & 
                              (df.TYPE == "snp") & 
                              ~df.OLDVAR.isin(['complex', 'mnp'])].tolist()
-        indels = df["POS"][(df.TOTAL_DP >= 20) & 
+        indels = df["POS"][(df.TOTAL_DP >= 30) & 
                            (df.ALT_FREQ >= 0.7) & 
                            ((df.TYPE == "ins") | (df.TYPE == "del"))].tolist()
         return (len(high_quality_snps), len(htz_snps), len(indels))
@@ -612,37 +614,37 @@ def extract_mapped_reads(out_stats_bamstats_dir, filename_out):
         return None
 
 
-def extract_n_consensus(out_consensus_dir, filename_out):
+# def extract_n_consensus(out_consensus_dir, filename_out):
 
-    filename_out = str(filename_out)
-    if "." in filename_out:
-        filename_out = filename_out.split(".")[0]
+#     filename_out = str(filename_out)
+#     if "." in filename_out:
+#         filename_out = filename_out.split(".")[0]
 
-    filename = os.path.join(out_consensus_dir, filename_out + ".fa")
+#     filename = os.path.join(out_consensus_dir, filename_out + ".fa")
 
-    if os.path.exists(filename):
-        with open(filename, "r") as f:
-            content = f.read()
-            content_list = content.split("\n")
-            # sample_fq = content_list[0].strip('>')
-            # In case fasta is in several lines(not by default)
-            sequence = ("").join(content_list[1:]).strip()
-            all_N = re.findall(r"N+", sequence)
-            if all_N:
-                leading_N = re.findall(r"^N+", sequence)
-                tailing_N = re.findall(r"N+$", sequence)
-                length_N = [len(x) for x in all_N]
-                individual_N = [x for x in length_N if x == 1]
-                mean_length_N = mean(length_N)
-                sum_length_N = sum(length_N)
-                total_perc_N = sum_length_N / len(sequence) * 100
-                return (len(all_N), len(individual_N), len(leading_N), len(tailing_N), sum_length_N, total_perc_N, mean_length_N)
-            else:
-                return (0, 0, 0, 0, 0, 0, 0)
+#     if os.path.exists(filename):
+#         with open(filename, "r") as f:
+#             content = f.read()
+#             content_list = content.split("\n")
+#             # sample_fq = content_list[0].strip('>')
+#             # In case fasta is in several lines(not by default)
+#             sequence = ("").join(content_list[1:]).strip()
+#             all_N = re.findall(r"N+", sequence)
+#             if all_N:
+#                 leading_N = re.findall(r"^N+", sequence)
+#                 tailing_N = re.findall(r"N+$", sequence)
+#                 length_N = [len(x) for x in all_N]
+#                 individual_N = [x for x in length_N if x == 1]
+#                 mean_length_N = mean(length_N)
+#                 sum_length_N = sum(length_N)
+#                 total_perc_N = sum_length_N / len(sequence) * 100
+#                 return (len(all_N), len(individual_N), len(leading_N), len(tailing_N), sum_length_N, total_perc_N, mean_length_N)
+#             else:
+#                 return (0, 0, 0, 0, 0, 0, 0)
 
-    else:
-        logger.info("FILE " + filename + " NOT FOUND")
-        return None
+#     else:
+#         logger.info("FILE " + filename + " NOT FOUND")
+#         return None
 
 
 def obtain_overal_stats(out_stats_dir, output_dir, group):
@@ -658,7 +660,7 @@ def obtain_overal_stats(out_stats_dir, output_dir, group):
     out_consensus_dir = os.path.join(output_dir, "Consensus")
 
     columns = ["#SAMPLE", "MEAN_COV", "UNMAPPED_PROP", "COV1-10X",
-               "COV>10X", "COV>20X", "COV>50X", "COV>100X", "COV>500X", "COV>1000X"]
+               "COV>10X", "COV>20X", "COV>30X", "COV>50X", "COV>100X", "COV>500X", "COV>1000X"]
 
     if os.path.exists(overal_stat_file):
         previous_stat = True
@@ -681,17 +683,17 @@ def obtain_overal_stats(out_stats_dir, output_dir, group):
                         out_variant_dir, x["#SAMPLE"]), axis=1, result_type="expand")
                     df[["reads_mapped", "perc_mapped"]] = df.parallel_apply(lambda x: extract_mapped_reads(
                         out_stats_bamstats_dir, x["#SAMPLE"]), axis=1, result_type="expand")
-                    df[["N_groups", "N_individual", "N_leading", "N_tailing", "N_sum_len", "N_total_perc", "N_mean_len"]] = df.parallel_apply(
-                        lambda x: extract_n_consensus(out_consensus_dir, x["#SAMPLE"]), axis=1, result_type="expand")
+                    # df[["N_groups", "N_individual", "N_leading", "N_tailing", "N_sum_len", "N_total_perc", "N_mean_len"]] = df.parallel_apply(
+                    #     lambda x: extract_n_consensus(out_consensus_dir, x["#SAMPLE"]), axis=1, result_type="expand")
 
     if previous_stat:
         df = pd.concat([df_stat, df], ignore_index=True, sort=True)
         df = df[columns + [col for col in df.columns if col != "#SAMPLE" and col != "MEAN_COV" and col != "UNMAPPED_PROP" and col !=
-                           "COV1-10X" and col != "COV>10X" and col != "COV>20X" and col != "COV>50X" and col != "COV>100X" and col != "COV>500X" and col != "COV>1000X"]]
+                           "COV1-10X" and col != "COV>10X" and col != "COV>20X" and col != "COV>30X" and col != "COV>50X" and col != "COV>100X" and col != "COV>500X" and col != "COV>1000X"]]
         df.to_csv(overal_stat_file, sep="\t", index=False)
     else:
         df = df[columns + [col for col in df.columns if col != "#SAMPLE" and col != "MEAN_COV" and col != "UNMAPPED_PROP" and col !=
-                           "COV1-10X" and col != "COV>10X" and col != "COV>20X" and col != "COV>50X" and col != "COV>100X" and col != "COV>500X" and col != "COV>1000X"]]
+                           "COV1-10X" and col != "COV>10X" and col != "COV>20X" and col != "COV>30X" and col != "COV>50X" and col != "COV>100X" and col != "COV>500X" and col != "COV>1000X"]]
         df.to_csv(overal_stat_file, sep="\t", index=False)
 
 
